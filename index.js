@@ -1,3 +1,4 @@
+
 const express = require('express');
 const app = express();
 const http = require('http').Server(app);
@@ -24,8 +25,10 @@ const defaultCardType = cardTypes[INNOCENT];
 
 const words = require('./words.json');
 
+// {<room-id>: {id: <number>, data: {round: <number>}, cards: [{id: <number>, text: <string>, covered: <boolean>}, ...]}, ...}
+const rooms = {};
+
 let round = 0;
-let flip_delay = false;
 
 app.get('/', (req, res) => {
     res.setHeader('Content-Type', 'text/html');
@@ -33,37 +36,17 @@ app.get('/', (req, res) => {
 });
 
 io.on('connection', (socket) => {
-    socket.on('create-new-round', () => {
-        if (flip_delay) return;
-        flip_delay = true;
+    socket.on('create-room', (username) => createRoom(socket, username));
+    socket.on('join-room', (username, room_id) => joinRoom(socket, username, room_id));
+    socket.on('new-game', (room_id) => newGame(room_id));
+    socket.on('new-round', (room_id) => newRound(room_id));
 
-        // create layout ids
-        let card_ids = setIds( setIds( setIds( setIds(
-            Array(25).fill(defaultCardType.id), 
-            8, RED ),
-            8, BLUE ),
-            1, round%2 == 0 ? RED : BLUE ),
-            1, ASSASSIN );
-
-        // create layout texts
-        let card_texts = randFrom(words, 25);
-
-        // combine ids and texts
-        cards = [];
-        for (let i = 0; i < 25; i++) {
-            cards.push({
-                id: card_ids[i],
-                text: card_texts[i]
-            });
-        }
-
-        // increment round
-        round++;
-        
-        // broadcast new layout
-        io.emit('new-round', cards);
-        setTimeout(() => flip_delay = false, 800);
-    });
+    socket.on('disconnect', () => {
+        Object.keys(rooms).forEach(room_id => {
+            delete rooms[room_id].players[socket.id]
+            io.to(room_id).emit('update-players', rooms[room_id].players);
+        });
+    })
 });
 
 function setIds(arr, num, id) {
@@ -93,6 +76,69 @@ function randFrom(arr, count) {
 
 function rand(min, max) {
     return Math.floor(Math.random() * (max - min) + min);
+}
+
+function createRoom(socket, username) {
+    do { var room_id = rand(100, 999);
+    } while (Object.keys(rooms).includes(room_id.toString()));
+    
+    rooms[room_id] = {id: room_id, players: {}, data: {round: 0}, cards: []};
+    rooms[room_id].players[socket.id] = username;
+
+    console.log(room_id);
+    socket.join(room_id.toString())
+    socket.emit('joined-room', room_id, true);
+    io.to(room_id.toString()).emit('update-players', rooms[room_id].players);
+}
+
+function joinRoom(socket, username, room_id) {
+    if (rooms[room_id] == null) return;
+    const players = rooms[room_id].players;
+    if (players.length >= 4) return;
+
+    // announce to new player that they have joined
+    socket.emit('joined-room', room_id, false);
+    players[socket.id] = username;
+    socket.join(room_id.toString())
+
+    // tell players about the new player that joined
+    io.to(room_id.toString()).emit('update-players', players);
+}
+
+function newGame(room_id) {
+    io.to(room_id.toString()).emit('new-game')
+}
+
+function newRound(room_id) {
+    // create layout ids
+    let card_ids = setIds( setIds( setIds( setIds(
+        Array(25).fill(defaultCardType.id), 
+        8, RED ),
+        8, BLUE ),
+        1, round%2 == 0 ? RED : BLUE ),
+        1, ASSASSIN );
+
+    // create layout texts
+    let card_texts = randFrom(words, 25);
+
+    // combine ids and texts
+    cards = [];
+    for (let i = 0; i < 25; i++) {
+        cards.push({
+            id: card_ids[i],
+            text: card_texts[i],
+            covered: false
+        });
+    }
+
+    // increment round
+    round++;
+
+    // add cards to room
+    rooms[room_id].cards = cards;
+    
+    // broadcast new layout
+    io.emit('new-round', rooms[room_id].cards);
 }
 
 http.listen(port, () => {

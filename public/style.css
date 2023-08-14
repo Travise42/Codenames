@@ -94,7 +94,7 @@ main {
 }
 
 .card-back {
-    transform: rotateX(180deg);
+    transform: rotateX(-180deg);
 }
 
 .card-img {
@@ -118,7 +118,7 @@ main {
 }
 
 .card-inner.flipped {
-    transform: rotateX(180deg);
+    transform: rotateX(-180deg);
     transition: transform 1s;
     transform-style: preserve-3d;
 }
