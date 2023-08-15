@@ -37,14 +37,19 @@ app.get('/', (req, res) => {
 
 io.on('connection', (socket) => {
     socket.on('create-room', (username) => createRoom(socket, username));
-    socket.on('join-room', (username, room_id) => joinRoom(socket, username, room_id));
+    socket.on('join-room', (room_id) => joinRoom(socket, room_id));
+    socket.on('join-team', (username, team, room_id) => joinTeam(socket, username, team, room_id));
     socket.on('new-game', (room_id) => newGame(room_id));
     socket.on('new-round', (room_id) => newRound(room_id));
 
     socket.on('disconnect', () => {
         Object.keys(rooms).forEach(room_id => {
-            delete rooms[room_id].players[socket.id]
-            io.to(room_id).emit('update-players', rooms[room_id].players);
+            delete rooms[room_id].players[socket.id];
+            if (Object.keys(rooms[room_id].players).length) {
+                io.to(room_id).emit('update-players', rooms[room_id].players);
+            } else {
+                delete rooms[room_id];
+            }
         });
     })
 });
@@ -78,28 +83,33 @@ function rand(min, max) {
     return Math.floor(Math.random() * (max - min) + min);
 }
 
-function createRoom(socket, username) {
+function createRoom(socket) {
     do { var room_id = rand(100, 999);
     } while (Object.keys(rooms).includes(room_id.toString()));
     
     rooms[room_id] = {id: room_id, players: {}, data: {round: 0}, cards: []};
-    rooms[room_id].players[socket.id] = username;
-
-    console.log(room_id);
-    socket.join(room_id.toString())
-    socket.emit('joined-room', room_id, true);
-    io.to(room_id.toString()).emit('update-players', rooms[room_id].players);
+    
+    joinRoom(socket, room_id, true);
 }
 
-function joinRoom(socket, username, room_id) {
+function joinRoom(socket, room_id, host = false) {
     if (rooms[room_id] == null) return;
-    const players = rooms[room_id].players;
-    if (players.length >= 4) return;
+    if (!host && Array.from(io.sockets.adapter.rooms.get(room_id.toString())).length >= 4) return;
+
+    // add player to room
+    socket.join(room_id.toString());
 
     // announce to new player that they have joined
-    socket.emit('joined-room', room_id, false);
-    players[socket.id] = username;
-    socket.join(room_id.toString())
+    socket.emit('joined-room', room_id, host);
+    socket.emit('update-players', rooms[room_id].players);
+}
+
+function joinTeam(socket, username, team, room_id) {
+
+    const players = rooms[room_id].players;
+
+    // add player to room
+    players[socket.id] = {name: username, team: team};
 
     // tell players about the new player that joined
     io.to(room_id.toString()).emit('update-players', players);
@@ -138,7 +148,7 @@ function newRound(room_id) {
     rooms[room_id].cards = cards;
     
     // broadcast new layout
-    io.emit('new-round', rooms[room_id].cards);
+    io.to(room_id.toString()).emit('new-round', rooms[room_id].cards, rooms[room_id].players, round);
 }
 
 http.listen(port, () => {

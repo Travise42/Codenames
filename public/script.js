@@ -20,6 +20,8 @@ const socket = io();
 let username;
 let room;
 let host;
+let team;
+let codeMaster;
 
 initName();
 
@@ -58,7 +60,7 @@ function createHomeScreen() {
     // add join room button and input to screen
     addChild(header, join_room_contianer);
 
-    join_room_button.addEventListener('click', () => joinRoom(join_room_input.value));
+    join_room_button.addEventListener('click', () => socket.emit('join-room', join_room_input.value));
 
     // create create room button
     const create_room_contianer = newElem('div', 'create-room-container');
@@ -71,15 +73,7 @@ function createHomeScreen() {
     // add create room button to screen
     addChild(header, create_room_contianer);
 
-    create_room_button.addEventListener('click', createRoom);
-}
-
-function createRoom() {
-    socket.emit('create-room', username);
-}
-
-function joinRoom(room_id) {
-    socket.emit('join-room', username, room_id);
+    create_room_button.addEventListener('click', () => socket.emit('create-room'));
 }
 
 socket.on('joined-room', (room_id_value, host_value) => {
@@ -113,18 +107,45 @@ function createRoomScreen() {
     // add room code heading to screen
     addChild(header, room_code_container)
 
-    // create joined players list
-    const joined_players_container = newElem('div', 'joined-players-container');
+    // create red players list
+    const red_players_container = newElem('div', 'red-players-container');
 
-    const joined_players_list = newElem('ul', null, 'joined-players-list');
-    const caption = newElem('caption');
-    caption.textContent = 'Joined players:';
+    const red_players_list = newElem('ul', null, 'red-players-list');
+    const red_players_caption = newElem('caption');
+    red_players_caption.textContent = 'Red team:';
 
-    addChild(joined_players_list, caption);
-    addChild(joined_players_container, joined_players_list);
+    addChild(red_players_list, red_players_caption);
+    addChild(red_players_container, red_players_list);
 
-    // add joined players list to screen
-    addChild(header, joined_players_container);
+    // create red players join button
+    const red_players_join_button = newElem('button', null, 'join-red-button');
+    red_players_join_button.textContent = 'Join';
+    addChild(red_players_container, red_players_join_button);
+    
+    // add red players list to screen
+    addChild(header, red_players_container);
+
+    red_players_join_button.addEventListener('click', () => joinTeam('red'));
+    
+    // create blue players list
+    const blue_players_container = newElem('div', 'blue-players-container');
+
+    const blue_players_list = newElem('ul', null, 'blue-players-list');
+    const blue_players_caption = newElem('caption');
+    blue_players_caption.textContent = 'Blue team:';
+
+    addChild(blue_players_list, blue_players_caption);
+    addChild(blue_players_container, blue_players_list);
+
+    // create blue players join button
+    const blue_players_join_button = newElem('button', null, 'join-blue-button');
+    blue_players_join_button.textContent = 'Join';
+    addChild(blue_players_container, blue_players_join_button);
+
+    // add blue players list to screen
+    addChild(header, blue_players_container);
+
+    blue_players_join_button.addEventListener('click', () => joinTeam('blue'));
 
     if (!host) return;
 
@@ -144,35 +165,56 @@ function createRoomScreen() {
     play_button.addEventListener('click', () => socket.emit('new-game', room_id));
 }
 
+function joinTeam(team_value) {
+    team = team_value;
+    socket.emit('join-team', username, team, room_id);
+}
+
 socket.on('update-players', players => {
-    const joined_players_list = document.getElementById('joined-players-list');
+    const join_blue_button = document.getElementById('join-blue-button');
+    const join_red_button = document.getElementById('join-red-button');
+
+    const red_players_list = document.getElementById('red-players-list');
+    const blue_players_list = document.getElementById('blue-players-list');
+
+    if (team == 'red') {
+        join_red_button.disabled = true;
+        join_blue_button.disabled = blue_players_list.children.length > 2;
+    } else if (team == 'blue') {
+        join_red_button.disabled = red_players_list.children.length > 2;
+        join_blue_button.disabled = true;
+    }
     
     document.querySelectorAll('.room-player').forEach(li => li.remove());
     
-    Object.entries(players).forEach(([player_id, player_name]) => {
+    Object.entries(players).forEach(([player_id, player_data]) => {
         const li = newElem('li', 'room-player');
-        li.textContent = player_name;
-        li.id = player_id;
-        addChild(joined_players_list, li);
+        li.textContent = player_data.name;
+
+        const id_meta = newElem('meta');
+        id_meta.name = "id";
+        id_meta.content = player_id;
+        
+        //const team_meta = newElem('meta');
+        //team_meta.name = "team";
+        //team_meta.content = player_data.team;
+
+        addChild(li, id_meta);
+        //addChild(li, team_meta);
+
+        if (player_data.team == 'red') {
+            addChild(red_players_list, li);
+        } else if (player_data.team == 'blue') {
+            addChild(blue_players_list, li);
+        }
     });
 
     if (!host) return;
 
-    if (players.length >= 4) {
+    if (Object.keys(players).length >= 4) {
         const play_button = document.getElementById('play-button');
         play_button.disabled = false;
     }
-});
-
-socket.on('player-left', user_id => {
-    const joined_players_list = document.getElementById('joined-players-list');
-    if (joined_players_list == null) return;
-
-    document.querySelectorAll('.room-player').forEach(li => {
-        if (li.textContent == user_id) {
-            li.remove();
-        }
-    });
 });
 
 socket.on('new-game', initGame);
@@ -184,7 +226,8 @@ function initGame() {
 }
 
 function removeRoomScreen() {
-    document.querySelector('.joined-players-container').remove();
+    document.querySelector('.red-players-container').remove();
+    document.querySelector('.blue-players-container').remove();
     if (!host) return;
     document.querySelector('.play-button-container').remove();
 }
@@ -226,7 +269,7 @@ function createGameScreen() {
 
 function createCards() {
     for (let i = 0; i < 25; i++) {
-        createCard(defaultCardType)
+        createCard();
     }
 }
 
@@ -265,7 +308,11 @@ function createCard() {
     gridCard(card_element);
 }
 
-socket.on('new-round', cards => newRound(cards));
+socket.on('new-round', (cards, players, round) => {
+    let team_members = Object.entries({...players}).filter(([key, value]) => value.team == team).sort((a, b) => a[0] - b[0]);
+    codeMaster = team_members[round%2][0] == socket.id;
+    newRound(cards);
+});
 
 function newRound(cards) {
     editCards(cards);
@@ -278,7 +325,7 @@ function editCards(cards) {
 
     card_elements.forEach( (card_element, i) => {
         let card_back = getCardBack(card_element);
-        addBackID(card_back, cards[i].id);
+        addBackID(card_back, codeMaster ? cards[i].id : defaultCardType.id);
         addBackImage(card_back);
         addBackText(card_back, cards[i].text);
     });

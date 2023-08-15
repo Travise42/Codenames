@@ -112,7 +112,7 @@ main {
     }
 }
 
-.card-back:hover {
+.card-front:hover {
     width: 106%;
     height: 106%;
 }
