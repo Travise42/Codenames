@@ -23,6 +23,13 @@ let host;
 let team;
 let codeMaster;
 
+const users = {
+    topleft: {id: undefined, name: undefined},
+    topright: {id: undefined, name: undefined},
+    bottomleft: {id: undefined, name: undefined},
+    bottomright: {id: undefined, name: undefined}
+};
+
 initName();
 
 function initName() {
@@ -177,13 +184,8 @@ socket.on('update-players', players => {
     const red_players_list = document.getElementById('red-players-list');
     const blue_players_list = document.getElementById('blue-players-list');
 
-    if (team == 'red') {
-        join_red_button.disabled = true;
-        join_blue_button.disabled = blue_players_list.children.length > 2;
-    } else if (team == 'blue') {
-        join_red_button.disabled = red_players_list.children.length > 2;
-        join_blue_button.disabled = true;
-    }
+    join_red_button.disabled = (team == 'red');
+    join_blue_button.disabled = (team == 'blue');
     
     document.querySelectorAll('.room-player').forEach(li => li.remove());
     
@@ -211,16 +213,17 @@ socket.on('update-players', players => {
 
     if (!host) return;
 
-    if (Object.keys(players).length >= 4) {
+    if (red_players_list.children.length > 2 && blue_players_list.children.length > 2) {
         const play_button = document.getElementById('play-button');
         play_button.disabled = false;
     }
 });
 
-socket.on('new-game', initGame);
+socket.on('new-game', (players) => initGame(players));
 
-function initGame() {
+function initGame(players) {
     removeRoomScreen();
+    definePlayerRolls(players)
     createGameScreen();
     createCards();
 }
@@ -230,6 +233,23 @@ function removeRoomScreen() {
     document.querySelector('.blue-players-container').remove();
     if (!host) return;
     document.querySelector('.play-button-container').remove();
+}
+
+function definePlayerRolls(players) {
+    // get you and your teamate
+    const teamates = Object.entries(players).filter(([player_id, player_data]) => player_data.team == team).sort(([a_id, a_data], [b_id, b_data]) => a_id - b_id);
+
+    // get your oppenents
+    const opponents = Object.entries(players).filter(([player_id, player_data]) => player_data.team != team).sort(([a_id, a_data], [b_id, b_data]) => a_id - b_id);
+
+    // place you in the bottom right
+    users.bottomright = {id: socket.id, name: username, team: team};
+
+    const top = +(teamates[0][0] == users.bottomright.id);
+    const bottom = 1-top;
+    users.topright = {id: teamates[top][0], name: teamates[top][1].name, team: teamates[top][1].team};
+    users.topleft = {id: opponents[top][0], name: opponents[top][1].name, team: opponents[top][1].team};
+    users.bottomleft = {id: opponents[bottom][0], name: opponents[bottom][1].name, team: opponents[bottom][1].team};
 }
 
 function createGameScreen() {
@@ -250,6 +270,9 @@ function createGameScreen() {
     // add functionality to flip button
     flip_button.addEventListener("click", () => socket.emit('new-round', room_id));
 
+    // get main section
+    const main = document.getElementById('main');
+
     // create card container
     const arr = ['a', 'b', 'c', 'd', 'e'];
 
@@ -262,9 +285,42 @@ function createGameScreen() {
     }
 
     // add card container to screen
-    const main = document.getElementById('main');
-
     addChild(main, card_container);
+
+    // make 4 name paragraphs
+    const topleft_container = newElem('div', 'topleft-user-container');
+    addClass(topleft_container, users.topleft.team);
+    const topleft_label = newElem('h3', 'topleft-user-label');
+    topleft_label.textContent = users.topleft.name;
+
+    addChild(topleft_container, topleft_label);
+
+    const bottomleft_container = newElem('div', 'bottomleft-user-container');
+    addClass(bottomleft_container, users.bottomleft.team);
+    const bottomleft_label = newElem('h3', 'bottomleft-user-label');
+    bottomleft_label.textContent = users.bottomleft.name;
+
+    addChild(bottomleft_container, bottomleft_label);
+
+    const topright_container = newElem('div', 'topright-user-container');
+    addClass(topright_container, users.topright.team);
+    const topright_label = newElem('h3', 'topright-user-label');
+    topright_label.textContent = users.topright.name;
+
+    addChild(topright_container, topright_label);
+
+    const bottomright_container = newElem('div', 'bottomright-user-container');
+    addClass(bottomright_container, users.bottomright.team);
+    const bottomright_label = newElem('h3', 'bottomright-user-label');
+    bottomright_label.textContent = users.bottomright.name + ' (You)';
+
+    addChild(bottomright_container, bottomright_label);
+
+    // add names to screen
+    addChild(main, topleft_container);
+    addChild(main, bottomleft_container);
+    addChild(main, topright_container);
+    addChild(main, bottomright_container);
 }
 
 function createCards() {

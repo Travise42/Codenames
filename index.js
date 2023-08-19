@@ -25,7 +25,6 @@ const defaultCardType = cardTypes[INNOCENT];
 
 const words = require('./words.json');
 
-// {<room-id>: {id: <number>, data: {round: <number>}, cards: [{id: <number>, text: <string>, covered: <boolean>}, ...]}, ...}
 const rooms = {};
 
 let round = 0;
@@ -36,23 +35,26 @@ app.get('/', (req, res) => {
 });
 
 io.on('connection', (socket) => {
+    // Socket Listeners
     socket.on('create-room', (username) => createRoom(socket, username));
     socket.on('join-room', (room_id) => joinRoom(socket, room_id));
     socket.on('join-team', (username, team, room_id) => joinTeam(socket, username, team, room_id));
     socket.on('new-game', (room_id) => newGame(room_id));
     socket.on('new-round', (room_id) => newRound(room_id));
 
-    socket.on('disconnect', () => {
-        Object.keys(rooms).forEach(room_id => {
-            delete rooms[room_id].players[socket.id];
-            if (Object.keys(rooms[room_id].players).length) {
-                io.to(room_id).emit('update-players', rooms[room_id].players);
-            } else {
-                delete rooms[room_id];
-            }
-        });
-    })
+    socket.on('disconnect', () => handleDisconnection(socket));
 });
+
+function handleDisconnection(socket) {
+    getRoomIds().forEach(room_id => {
+        delete getPlayers(room_id)[socket.id];
+        if (Object.keys(getPlayers(room_id)).length) {
+            io.to(room_id).emit('update-players', getPlayers(room_id));
+        } else {
+            delete getRoom(room_id);
+        }
+    });
+}
 
 function setIds(arr, num, id) {
     i = 0;
@@ -85,11 +87,9 @@ function rand(min, max) {
 
 function createRoom(socket) {
     do { var room_id = rand(100, 999);
-    } while (Object.keys(rooms).includes(room_id.toString()));
+    } while (getRoomIds().includes(room_id.toString()));
     
-    rooms[room_id] = {id: room_id, players: {}, data: {round: 0}, cards: []};
-    
-    joinRoom(socket, room_id, true);
+    joinRoom(socket, newRoom(room_id), true);
 }
 
 function joinRoom(socket, room_id, host = false) {
@@ -101,12 +101,12 @@ function joinRoom(socket, room_id, host = false) {
 
     // announce to new player that they have joined
     socket.emit('joined-room', room_id, host);
-    socket.emit('update-players', rooms[room_id].players);
+    socket.emit('update-players', getPlayers(room_id));
 }
 
 function joinTeam(socket, username, team, room_id) {
 
-    const players = rooms[room_id].players;
+    const players = getPlayers(room_id);
 
     // add player to room
     players[socket.id] = {name: username, team: team};
@@ -116,7 +116,7 @@ function joinTeam(socket, username, team, room_id) {
 }
 
 function newGame(room_id) {
-    io.to(room_id.toString()).emit('new-game')
+    io.to(room_id.toString()).emit('new-game', getPlayers(room_id));
 }
 
 function newRound(room_id) {
@@ -145,10 +145,33 @@ function newRound(room_id) {
     round++;
 
     // add cards to room
-    rooms[room_id].cards = cards;
+    getRoom(room_id).cards = cards;
     
     // broadcast new layout
-    io.to(room_id.toString()).emit('new-round', rooms[room_id].cards, rooms[room_id].players, round);
+    io.to(room_id.toString()).emit('new-round', getRoom(room_id).cards, getPlayers(room_id), round);
+}
+
+function newRoom(id) {
+    rooms[id] = {id: id, players: {}, data: {round: 0}, cards: []};
+    return id;
+}
+
+function getRoom(id) {
+    const room = rooms[id];
+
+    if (room == null) {
+        console.log('ERROR || Room not found:\nRoom id of ' + id + ' does not exist');
+        return {id: id, players: {}, data: {round: 0}, cards: []};
+    }
+    return room;
+}
+
+function getPlayers(id) {
+    return getRoom(id).players;
+}
+
+function getRoomIds() {
+    return Object.keys(rooms);
 }
 
 http.listen(port, () => {
