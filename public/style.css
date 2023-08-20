@@ -92,6 +92,12 @@ main {
     height: 100%;
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
+    transition: transform 500ms ease-in-out;
+}
+
+.card-cover.new {
+    transform: scale(150%, 150%);
+    transition: none;
 }
 
 .card-back {

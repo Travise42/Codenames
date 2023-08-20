@@ -337,12 +337,15 @@ socket.on('cover-card', (pos, id) => {
     
     // create card cover
     const card_cover = newElem('div', 'card-cover');
+    addClass(card_cover, 'new');
     const card_cover_img = newElem('img', 'card-img');
     addPath(card_cover_img, cardTypes[id].agentPaths[parseInt(pos.charAt(1)) % cardTypes[id].agentPaths.length]);
     addChild(card_cover, card_cover_img);
 
     // Add card cover to screen
     addChild(inner, card_cover);
+
+    setTimeout(() => removeClass(card_cover, 'new'), 10);
 });
 
 function createCard() {
@@ -386,9 +389,18 @@ socket.on('new-round', (cards, players, round) => {
 });
 
 function newRound(cards) {
+    clearAgents();
     editCards(cards);
     flipCards();
     setTimeout(() => unflipCards(cards), 800);
+}
+
+function clearAgents() {
+    const agents = document.querySelectorAll('.card-cover');
+
+    agents.forEach((agent) => {
+        agent.remove();
+    });
 }
 
 function editCards(cards) {
