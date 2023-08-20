@@ -6,11 +6,11 @@ const INNOCENT = 4;
 const ASSASSIN = 5;
 
 const cardTypes = {
-    1: {id: RED, imagePath: "img/cards/red.png"},
-    2: {id: GREEN, imagePath: "img/cards/green.png"},
-    3: {id: BLUE, imagePath: "img/cards/blue.png"},
-    4: {id: INNOCENT, imagePath: "img/cards/innocent.png"},
-    5: {id: ASSASSIN, imagePath: "img/cards/assassin.png"}
+    1: {id: RED, imagePath: "img/cards/red.png", agentPaths: ["img/agents/red1.png", "img/agents/red2.png"]},
+    2: {id: GREEN, imagePath: "img/cards/green.png", agentPaths: ["img/agents/green1.png", "img/agents/green2.png"]},
+    3: {id: BLUE, imagePath: "img/cards/blue.png", agentPaths: ["img/agents/blue1.png", "img/agents/blue2.png"]},
+    4: {id: INNOCENT, imagePath: "img/cards/innocent.png", agentPaths: ["img/agents/innocent1.png", "img/agents/innocent2.png"]},
+    5: {id: ASSASSIN, imagePath: "img/cards/assassin.png", agentPaths: ["img/agents/assassin.png"]}
 }
 
 const defaultCardType = cardTypes[INNOCENT];
@@ -18,7 +18,7 @@ const defaultCardType = cardTypes[INNOCENT];
 const socket = io();
 
 let username;
-let room;
+let room_id;
 let host;
 let team;
 let codeMaster;
@@ -259,7 +259,7 @@ function createGameScreen() {
     // create flip button
     const flip_button_container = newElem('div', 'flip-button-container');
 
-    const flip_button = newElem('button', null, 'flip-button');
+    const flip_button = newElem('button', 'flip-button');
     flip_button.textContent = 'Flip';
 
     addChild(flip_button_container, flip_button);
@@ -269,7 +269,7 @@ function createGameScreen() {
 
     // add functionality to flip button
     flip_button.addEventListener("click", () => socket.emit('new-round', room_id));
-
+    
     // get main section
     const main = document.getElementById('main');
 
@@ -279,7 +279,8 @@ function createGameScreen() {
     const card_container = newElem('div', 'card-container');
     for (var r = 1; r <= 5; r++) {
         for (var i = 0; i < 5; i++) {
-            let card_pos = newElem('div', 'card-pos-' + arr[i] + r);
+            let card_pos = newElem('div', 'card-pos-' + arr[i] + r, arr[i] + r);
+            card_pos.addEventListener('click', () => guessCard(card_pos.id));
             addChild(card_container, card_pos);
         }
     }
@@ -329,8 +330,22 @@ function createCards() {
     }
 }
 
-function createCard() {
+socket.on('cover-card', (pos, id) => {
+    const card_pos = document.getElementById(pos);
+    const card = card_pos.firstChild;
+    const inner = card.firstChild;
+    
+    // create card cover
+    const card_cover = newElem('div', 'card-cover');
+    const card_cover_img = newElem('img', 'card-img');
+    addPath(card_cover_img, cardTypes[id].agentPaths[parseInt(pos.charAt(1)) % cardTypes[id].agentPaths.length]);
+    addChild(card_cover, card_cover_img);
 
+    // Add card cover to screen
+    addChild(inner, card_cover);
+});
+
+function createCard() {
     // create divs for a new card
     const card_element = newElem('div', 'card');
     const card_inner = newElem('div', 'card-inner');
@@ -338,12 +353,12 @@ function createCard() {
     const card_back = newElem('div', 'card-back');
 
     // create front image
-    const card_img = newElem('img', 'card-img');
-    addChild(card_front, card_img);
+    const card_front_img = newElem('img', 'card-img');
+    addChild(card_front, card_front_img);
 
     //create front text
-    const card_text = newElem('p', 'card-text');
-    addChild(card_front, card_text);
+    const card_front_text = newElem('p', 'card-text');
+    addChild(card_front, card_front_text);
 
     // create empty back image
     const card_back_img = newElem('img', 'card-img');
@@ -385,6 +400,10 @@ function editCards(cards) {
         addBackImage(card_back);
         addBackText(card_back, cards[i].text);
     });
+}
+
+function guessCard(pos) {
+    socket.emit('guess-card', pos, room_id);
 }
 
 function getCardBack(card_element) {

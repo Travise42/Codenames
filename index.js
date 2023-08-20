@@ -31,7 +31,7 @@ let round = 0;
 
 app.get('/', (req, res) => {
     res.setHeader('Content-Type', 'text/html');
-    res.sendFile(__dirname + '/index.html');
+    res.sendFile(`${__dirname}/index.html`);
 });
 
 io.on('connection', (socket) => {
@@ -41,7 +41,11 @@ io.on('connection', (socket) => {
     socket.on('join-team', (username, team, room_id) => joinTeam(socket, username, team, room_id));
     socket.on('new-game', (room_id) => newGame(room_id));
     socket.on('new-round', (room_id) => newRound(room_id));
+    
+    // ingame
+    socket.on('guess-card', (pos, room_id) => guessCard(socket, pos, room_id));
 
+    // leaving game
     socket.on('disconnect', () => handleDisconnection(socket));
 });
 
@@ -151,6 +155,16 @@ function newRound(room_id) {
     io.to(room_id.toString()).emit('new-round', getRoom(room_id).cards, getPlayers(room_id), round);
 }
 
+function guessCard(socket, pos, room_id) {
+    const arr = ['a', 'b', 'c', 'd', 'e'];
+    const card_index = arr.indexOf(pos.charAt(0)) + (parseInt(pos.charAt(1)) - 1) * 5;
+    const card = getRoom(room_id).cards[card_index]
+    if (card.covered) return;
+    card.covered = true;
+    //socket.emit('end-of-turn');
+    io.to(room_id.toString()).emit('cover-card', pos, card.id);
+}
+
 function newRoom(id) {
     rooms[id] = {id: id, players: {}, data: {round: 0}, cards: []};
     return id;
@@ -160,7 +174,7 @@ function getRoom(id) {
     const room = rooms[id];
 
     if (room == null) {
-        console.log('ERROR || Room not found:\nRoom id of ' + id + ' does not exist');
+        console.log(`ERROR || Room not found:\nRoom id of ${id} does not exist`);
         return {id: id, players: {}, data: {round: 0}, cards: []};
     }
     return room;
