@@ -322,6 +322,17 @@ function createGameScreen() {
     addChild(main, bottomleft_container);
     addChild(main, topright_container);
     addChild(main, bottomright_container);
+
+    // create game log
+    const game_log_container = newElem('div', 'game-log-container');
+    const game_log_caption = newElem('h3');
+    game_log_caption.textContent = 'Game log'
+    addChild(game_log_container, game_log_caption);
+    const game_log_list = newElem('ul', 'game-log', 'game-log');
+    addChild(game_log_container, game_log_list);
+
+    // add game log to screen
+    addChild(main, game_log_container);
 }
 
 function createCards() {
@@ -389,10 +400,46 @@ socket.on('new-round', (cards, players, round) => {
 });
 
 function newRound(cards) {
+    removeClueInput();
+    addClueinput();
     clearAgents();
     editCards(cards);
     flipCards();
     setTimeout(() => unflipCards(cards), 800);
+}
+
+function removeClueInput() {
+    const give_clue_container = document.querySelector('.give-clue-container');
+    if (give_clue_container == null) return;
+    give_clue_container.remove();
+}
+
+function addClueinput() {
+    if (!codeMaster) return;
+
+    // get main section
+    const main = document.getElementById('main');
+
+    // create 'give clue' button and input fields
+    const give_clue_container = newElem('div', 'give-clue-container');
+    const clue_input = newElem('input', 'clue-input', 'clue-input');
+    clue_input.type = 'text';
+    clue_input.placeholder = 'Enter your clue here';
+    addChild(give_clue_container, clue_input);
+    const clue_amount_input = newElem('input', 'clue-amount-input', 'clue-amount-input');
+    clue_amount_input.type = 'number';
+    clue_amount_input.value = 1;
+    clue_amount_input.min = 0;
+    clue_amount_input.max = 9;
+    addChild(give_clue_container, clue_amount_input);
+    const give_clue_button = newElem('button', 'give-clue-button', 'give-clue-button');
+    give_clue_button.textContent = 'Give Clue';
+    addChild(give_clue_container, give_clue_button);
+
+    // add 'give clue' button and input fields to screen
+    addChild(main, give_clue_container);
+
+    give_clue_button.addEventListener('click', giveClue);
 }
 
 function clearAgents() {
@@ -417,6 +464,36 @@ function editCards(cards) {
 function guessCard(pos) {
     socket.emit('guess-card', pos, room_id);
 }
+
+function giveClue() {
+    const clue_element = document.getElementById('clue-input');
+    const amount_element = document.getElementById('clue-amount-input');
+
+    if (!clue_element.textContent) return;
+
+    const card_poses = document.querySelector('card-container').children;
+    const duplicates = [];
+    card_poses.forEach((card_pos) => {
+        const card = card_pos.firstChild;
+        const inner = card.firstChild;
+        if (inner.children.length > 2) return;
+        if (clue_element.textContent.toLowerCase() == inner.firstChild.lastChild.textContent.toLowerCase()) duplicates.push(card_pos);
+    });
+    if (duplicates.length) return;
+
+    socket.emit('give-clue', clue_element.textContent, amount_element.value, {name: username, team: team}, room_id);
+}
+
+socket.on('give-clue', (clue, amount, sender) => {
+    // get game log
+    const game_log = document.getElementById('game-log');
+
+    // create new list element
+    const log_message = newElem('li', 'log-message');
+    addClass(log_message, sender.team);
+    log_message.textContent = `${sender.name}: '${clue}' for ${amount}`;
+    addChild(game_log, log_message);
+});
 
 function getCardBack(card_element) {
     const card_inner = card_element.firstChild;

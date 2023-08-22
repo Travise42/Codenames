@@ -187,3 +187,31 @@ main {
     transform: translate(0, -50%);
 }
 
+.game-log-container {
+    position: absolute;
+    right: 0;
+    top: 25%;
+    bottom: 0;
+    width: 12rem;
+    height: 75%;
+    border: 1px solid black;
+}
+
+.game-log {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    list-style-type: none;
+}
+
+.log-message {
+    &.red {
+        background: #ff7c7c;
+    }
+    &.blue {
+        background:#6f77ff;
+    }
+    &.green {
+        background: #7aff85;
+    }
+}

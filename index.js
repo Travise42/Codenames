@@ -44,6 +44,7 @@ io.on('connection', (socket) => {
     
     // ingame
     socket.on('guess-card', (pos, room_id) => guessCard(socket, pos, room_id));
+    socket.on('give-clue', (clue, amount, sender, room_id) => giveClue(socket, clue, amount, sender, room_id));
 
     // leaving game
     socket.on('disconnect', () => handleDisconnection(socket));
@@ -159,10 +160,14 @@ function guessCard(socket, pos, room_id) {
     const arr = ['a', 'b', 'c', 'd', 'e'];
     const card_index = arr.indexOf(pos.charAt(0)) + (parseInt(pos.charAt(1)) - 1) * 5;
     const card = getRoom(room_id).cards[card_index]
-    if (card.covered) return;
+    if (card == null || card.covered) return;
     card.covered = true;
     //socket.emit('end-of-turn');
     io.to(room_id.toString()).emit('cover-card', pos, card.id);
+}
+
+function giveClue(socket, clue, amount, sender, room_id) {
+    io.to(room_id.toString()).emit('give-clue', clue, amount, sender);
 }
 
 function newRoom(id) {

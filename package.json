@@ -1,0 +1,9 @@
+{
+    "name": "code-names",
+    "version": "0.0.1",
+    "description": "Play codenames online with your friends",
+    "dependencies": {
+        "express": "^4.18.2",
+        "socket.io": "^4.7.2"
+    }
+}
