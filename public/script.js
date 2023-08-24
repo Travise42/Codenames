@@ -253,8 +253,8 @@ function definePlayerRolls(players) {
 }
 
 function createGameScreen() {
-    // get header
-    const header = document.getElementById('header');
+    // get main section
+    const main = document.getElementById('main');
 
     // create flip button
     const flip_button_container = newElem('div', 'flip-button-container');
@@ -265,13 +265,10 @@ function createGameScreen() {
     addChild(flip_button_container, flip_button);
 
     // add flip button to screen
-    addChild(header, flip_button_container);
+    addChild(main, flip_button_container);
 
     // add functionality to flip button
     flip_button.addEventListener("click", () => socket.emit('new-round', room_id));
-    
-    // get main section
-    const main = document.getElementById('main');
 
     // create card container
     const arr = ['a', 'b', 'c', 'd', 'e'];
@@ -325,7 +322,7 @@ function createGameScreen() {
 
     // create game log
     const game_log_container = newElem('div', 'game-log-container');
-    const game_log_caption = newElem('h3');
+    const game_log_caption = newElem('h3', 'game-log-caption');
     game_log_caption.textContent = 'Game log'
     addChild(game_log_container, game_log_caption);
     const game_log_list = newElem('ul', 'game-log', 'game-log');
@@ -469,22 +466,29 @@ function giveClue() {
     const clue_element = document.getElementById('clue-input');
     const amount_element = document.getElementById('clue-amount-input');
 
-    if (!clue_element.textContent) return;
+    if (!clue_element.value) return;
 
-    const card_poses = document.querySelector('card-container').children;
+    const card_poses = Array.from(document.querySelector('.card-container').children);
     const duplicates = [];
     card_poses.forEach((card_pos) => {
         const card = card_pos.firstChild;
         const inner = card.firstChild;
-        if (inner.children.length > 2) return;
-        if (clue_element.textContent.toLowerCase() == inner.firstChild.lastChild.textContent.toLowerCase()) duplicates.push(card_pos);
+        if (inner.lastChild.className == 'card-cover') return;
+        removeClass(card_pos, 'invalid');
+        if (clue_element.value.toLowerCase() == inner.firstChild.lastChild.textContent.toLowerCase()) duplicates.push(card_pos);
     });
-    if (duplicates.length) return;
+    if (duplicates.length) {
+        duplicates.forEach((card_pos) => {
+            addClass(card_pos, 'invalid');
+        });
+        return;
+    }
 
-    socket.emit('give-clue', clue_element.textContent, amount_element.value, {name: username, team: team}, room_id);
+    socket.emit('give-clue', clue_element.value, amount_element.value, {name: username, team: team}, room_id);
+    clue_element.value = '';
 }
 
-socket.on('give-clue', (clue, amount, sender) => {
+socket.on('recive-clue', (clue, amount, sender) => {
     // get game log
     const game_log = document.getElementById('game-log');
 
@@ -493,6 +497,8 @@ socket.on('give-clue', (clue, amount, sender) => {
     addClass(log_message, sender.team);
     log_message.textContent = `${sender.name}: '${clue}' for ${amount}`;
     addChild(game_log, log_message);
+
+    game_log.scrollTop = game_log.scrollHeight
 });
 
 function getCardBack(card_element) {

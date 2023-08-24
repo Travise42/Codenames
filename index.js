@@ -23,7 +23,7 @@ const cardTypes = {
 
 const defaultCardType = cardTypes[INNOCENT];
 
-const words = require('./words.json');
+const words = require('./words.json').map(a => a.toUpperCase());
 
 const rooms = {};
 
@@ -167,7 +167,7 @@ function guessCard(socket, pos, room_id) {
 }
 
 function giveClue(socket, clue, amount, sender, room_id) {
-    io.to(room_id.toString()).emit('give-clue', clue, amount, sender);
+    io.to(room_id.toString()).emit('recive-clue', clue.toUpperCase(), amount, sender);
 }
 
 function newRoom(id) {
