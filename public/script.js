@@ -54,15 +54,14 @@ function createHomeScreen() {
     // create join room button and input
     const join_room_contianer = newElem('div', 'join-room-container');
 
-    const join_room_button = newElem('button', null, 'join-room-button');
-    join_room_button.textContent = 'Join Room';
     const join_room_input = newElem('input', null, 'join-room-input');
     join_room_input.type = 'tel';
     join_room_input.name = 'join-room-input';
     join_room_input.placeholder = 'Room Code';
-
-    addChild(join_room_contianer, join_room_button);
     addChild(join_room_contianer, join_room_input);
+    const join_room_button = newElem('button', null, 'join-room-button');
+    join_room_button.textContent = 'Join Room';
+    addChild(join_room_contianer, join_room_button);
 
     // add join room button and input to screen
     addChild(header, join_room_contianer);
@@ -117,11 +116,10 @@ function createRoomScreen() {
     // create red players list
     const red_players_container = newElem('div', 'red-players-container');
 
+    const red_players_caption = newElem('caption', null, 'caption');
+    red_players_caption.textContent = 'Red Team';
+    addChild(red_players_container, red_players_caption);
     const red_players_list = newElem('ul', null, 'red-players-list');
-    const red_players_caption = newElem('caption');
-    red_players_caption.textContent = 'Red team:';
-
-    addChild(red_players_list, red_players_caption);
     addChild(red_players_container, red_players_list);
 
     // create red players join button
@@ -137,11 +135,10 @@ function createRoomScreen() {
     // create blue players list
     const blue_players_container = newElem('div', 'blue-players-container');
 
+    const blue_players_caption = newElem('caption', null, 'caption');
+    blue_players_caption.textContent = 'Blue Team';
+    addChild(blue_players_container, blue_players_caption);
     const blue_players_list = newElem('ul', null, 'blue-players-list');
-    const blue_players_caption = newElem('caption');
-    blue_players_caption.textContent = 'Blue team:';
-
-    addChild(blue_players_list, blue_players_caption);
     addChild(blue_players_container, blue_players_list);
 
     // create blue players join button
@@ -213,7 +210,7 @@ socket.on('update-players', players => {
 
     if (!host) return;
 
-    if (red_players_list.children.length > 2 && blue_players_list.children.length > 2) {
+    if (red_players_list.children.length >= 2 && blue_players_list.children.length >= 2) {
         const play_button = document.getElementById('play-button');
         play_button.disabled = false;
     }
@@ -255,6 +252,7 @@ function definePlayerRolls(players) {
 function createGameScreen() {
     // get main section
     const main = document.getElementById('main');
+    main.className = 'playing-board';
 
     // create flip button
     const flip_button_container = newElem('div', 'flip-button-container');
