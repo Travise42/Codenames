@@ -1,3 +1,5 @@
+/* <<< Variables >>> */
+
 :root {
     --card-width: 150px;
     --card-height: 100px;
@@ -15,9 +17,13 @@
     --color-blue: #6f77fa;
 }
 
+/* <<< Screen >>> */
+
 body {
     background: var(--color-tertiary);
 }
+
+/* <<< Standard for headings >>> */
 
 h1 {
     font-family: Verdana, Geneva, Tahoma, sans-serif;
@@ -27,11 +33,12 @@ h1 {
     margin: 1rem 40%;
     color: var(--color-contrast);
 }
-
 h2, h3 {
     text-align: center;
     color: var(--color-contrast);
 }
+
+/* <<< Standard for inputs >>> */
 
 input {
     background: var(--color-primary);
@@ -64,7 +71,7 @@ button {
         background: var(--color-highlight);
     }
 
-    &:active {
+    &:active, &:disabled {
         color: var(--color-highlight);
         background: var(--color-tertiary);
         border: 3px inset var(--color-contrast);
@@ -72,7 +79,11 @@ button {
     }
 }
 
-.play-button-container {
+/* <<< Name Screen >>> */
+
+.name-container {
+    position: relative;
+    margin-top: 5rem;
     font-family: Verdana, Geneva, Tahoma, sans-serif;
     font-size: 1.1rem;
     text-align: center;
@@ -86,15 +97,19 @@ button {
     padding-left: 0.5rem;
 }
 
-#play-button {
+#name-button {
     position: relative;
     width: 4rem;
     height: 3rem;
+    margin-left: 1rem;
 }
+
+/* <<< Home Screen >>> */
 
 .join-room-container {
     position: absolute;
     right: 55%;
+    margin-top: 5rem;
     font-family: Verdana, Geneva, Tahoma, sans-serif;
     font-size: 1.1rem;
     text-align: center;
@@ -119,6 +134,7 @@ button {
 .create-room-container {
     position: absolute;
     left: 55%;
+    margin-top: 5rem;
     font-family: Verdana, Geneva, Tahoma, sans-serif;
     font-size: 1.1rem;
     text-align: center;
@@ -131,46 +147,38 @@ button {
     height: 3rem;
 }
 
+/* <<< Lobby Screen >>> */
+
+.red-players-container, .blue-players-container {
+    position: absolute;
+    padding: 1rem 0;
+    width: 15rem;
+    height: 9rem;
+    text-align: center;
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    background: var(--color-primary);
+    border-radius: 1rem;
+    border: 4px solid var(--color-contrast);
+}
 .red-players-container {
-    position: absolute;
     right: 55%;
-    padding: 1rem 0;
-    width: 15rem;
-    height: 9rem;
-    text-align: center;
-    font-family: Verdana, Geneva, Tahoma, sans-serif;
-    background: var(--color-primary);
-    border-radius: 1rem;
-    border: 4px solid var(--color-contrast);
-    
-    #caption {
-        position: absolute;
-        width: 100%;
-        color: var(--color-red);
-        font-size: 1.3rem;
-    }
 }
-
 .blue-players-container {
-    position: absolute;
     left: 55%;
-    padding: 1rem 0;
-    width: 15rem;
-    height: 9rem;
-    text-align: center;
-    font-family: Verdana, Geneva, Tahoma, sans-serif;
-    background: var(--color-primary);
-    border-radius: 1rem;
-    border: 4px solid var(--color-contrast);
-    
-    #caption {
-        position: absolute;
-        width: 100%;
-        color: var(--color-blue);
-        font-size: 1.3rem;
-    }
 }
 
+#red-players-heading, #blue-players-heading {
+    position: absolute;
+    width: 100%;
+    font-size: 1.3rem;
+    margin: 0;
+}
+#red-players-heading {
+    color: var(--color-red);
+}
+#blue-players-heading {
+    color: var(--color-blue);
+}
 
 #red-players-list, #blue-players-list {
     position: relative;
@@ -182,7 +190,7 @@ button {
     transform: translateX(-50%);
 }
 
-#join-red-button, #join-blue-button {
+#red-players-button, #blue-players-button {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
@@ -192,17 +200,32 @@ button {
     height: 3rem;
 }
 
-.playing-board {
-    height: calc((var(--card-height) + var(--card-gap-size)) * 5 + 2rem);
-    display: flex;
-    justify-content: center;
-    border-radius: 2rem;
-    border: 1px solid black;
-    position: relative;
-    margin-top: 5rem;
+.play-button-container {
     font-family: Verdana, Geneva, Tahoma, sans-serif;
-    border: 5px solid var(--color-contrast);
-    background: var(--color-primary);
+    font-size: 1.1rem;
+    text-align: center;
+}
+#play-button {
+    position: relative;
+    width: 4rem;
+    height: 3rem;
+}
+
+/* <<< Game Screen >>> */
+
+.main {
+    &.playing-board {
+        height: calc((var(--card-height) + var(--card-gap-size)) * 5 + 2rem);
+        display: flex;
+        justify-content: center;
+        border-radius: 2rem;
+        border: 1px solid black;
+        position: relative;
+        margin-top: 5rem;
+        font-family: Verdana, Geneva, Tahoma, sans-serif;
+        border: 5px solid var(--color-contrast);
+        background: var(--color-primary);
+    }
 }
 
 .card-container {
@@ -343,14 +366,14 @@ button {
     transform: translateX(-50%);
 }
 
-.flip-button {
+#flip-button {
     position: relative;
     border-radius: 0.6rem;
     width: 100%;
     height: 100%;
 }
 
-.topleft-user-container, .bottomleft-user-container, .topright-user-container, .bottomright-user-container {
+.topleft-nametag-container, .bottomleft-nametag-container, .topright-nametag-container, .bottomright-nametag-container {
     position: absolute;
     width: 10rem;
     height: 3rem;
@@ -372,27 +395,27 @@ button {
     }
 }
 
-.topleft-user-container {
+.topleft-nametag-container {
     left: 0;
     top: -4rem;
 }
 
-.bottomleft-user-container {
+.bottomleft-nametag-container {
     left: 0;
     bottom: -4rem;
 }
 
-.topright-user-container {
+.topright-nametag-container {
     right: 0;
     top: -4rem;
 }
 
-.bottomright-user-container {
+.bottomright-nametag-container {
     right: 0;
     bottom: -4rem;
 }
 
-.topleft-user-label, .bottomleft-user-label, .topright-user-label, .bottomright-user-label {
+.topleft-nametag-label, .bottomleft-nametag-label, .topright-nametag-label, .bottomright-nametag-label {
     position: relative;
     text-align: center;
     margin: 0;
@@ -426,7 +449,7 @@ button {
     border-top: 2px solid var(--color-contrast);
     border-bottom: 2px solid var(--color-contrast);
     width: 100%;
-    height: 32%;
+    height: 25%;
     overflow-x: hidden;
     overflow-y: scroll;
     scroll-padding-bottom: 6rem;
