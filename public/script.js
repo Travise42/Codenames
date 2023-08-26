@@ -364,7 +364,7 @@ function createGameScreen() {
 
     // Create topleft nametag container
     const topleft_nametag_container = newElem('div', 'topleft-nametag-container');
-    addClass(topleft_nametag_container, opp_team);
+    addClass(topleft_nametag_container, cardTypes[opp_team].string);
 
     // Create topleft nametag label
     const topleft_nametag_label = newElem('h3', 'topleft-nametag-label');
@@ -378,7 +378,7 @@ function createGameScreen() {
 
     // Create bottomleft nametag container
     const bottomleft_nametag_container = newElem('div', 'bottomleft-nametag-container');
-    addClass(bottomleft_nametag_container, opp_team);
+    addClass(bottomleft_nametag_container, cardTypes[opp_team].string);
 
     // Create bottomleft nametag label
     const bottomleft_nametag_label = newElem('h3', 'bottomleft-nametag-label');
@@ -392,7 +392,7 @@ function createGameScreen() {
 
     // Create topright nametag container
     const topright_nametag_container = newElem('div', 'topright-nametag-container');
-    addClass(topright_nametag_container, user.team);
+    addClass(topright_nametag_container, cardTypes[user.team].string);
     
     // Create topright nametag label
     const topright_nametag_label = newElem('h3', 'topright-nametag-label');
@@ -406,7 +406,7 @@ function createGameScreen() {
 
     // Create bottomright nametag container
     const bottomright_nametag_container = newElem('div', 'bottomright-nametag-container');
-    addClass(bottomright_nametag_container, user.team);
+    addClass(bottomright_nametag_container, cardTypes[user.team].string);
     
     // Create bottomright nametag label
     const bottomright_nametag_label = newElem('h3', 'bottomright-nametag-label');
@@ -510,9 +510,9 @@ function getFreePos() {
     return openContainers[0].className;
 }
 
-socket.on('new-round', (cards, players, round) => {
+socket.on('new-round', (cards, players) => {
     let team_members = Object.entries({...players}).filter(([key, value]) => value.team == user.team).sort((a, b) => a[0] - b[0]);
-    user.isCodeMaster = team_members[round%2][0] == socket.id;
+    user.isCodeMaster = (user.isCodeMaster == null) ? team_members[0][0] == socket.id : !user.isCodeMaster;
     newRound(cards);
 });
 
@@ -632,7 +632,7 @@ socket.on('recive-clue', (clue, amount, sender) => {
 
     // create new list element
     const log_message = newElem('li', 'log-message');
-    addClass(log_message, sender.team);
+    addClass(log_message, cardTypes[sender.team].string);
     log_message.textContent = `${sender.name}: '${clue}' for ${amount}`;
     addChild(game_log, log_message);
 

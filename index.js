@@ -1,4 +1,12 @@
 
+// ----------------------------------------------------------------------------------------------------
+// Import Functions
+
+const {randIntBetween, randInt, randFrom} = require('./func.js');
+
+// ----------------------------------------------------------------------------------------------------
+// Initiate Server
+
 const express = require('express');
 const app = express();
 const http = require('http').Server(app);
@@ -7,42 +15,50 @@ const port = process.env.PORT || 5500;
 app.use(express.static('public'));
 app.use('/img', express.static('img'));
 
+app.get('/', (req, res) => {
+    res.setHeader('Content-Type', 'text/html');
+    res.sendFile(`${__dirname}/index.html`);
+});
+
+http.listen(port, () => console.log(`Socket.IO server running at http://localhost:${port}/`));
+
+// ----------------------------------------------------------------------------------------------------
+// Define Constants
+
 const RED = 1;
 const GREEN = 2;
 const BLUE = 3;
 const INNOCENT = 4;
 const ASSASSIN = 5;
 
-const cardTypes = {
-    1: {id: RED, imagePath: "img/cards/red.png"},
-    2: {id: GREEN, imagePath: "img/cards/green.png"},
-    3: {id: BLUE, imagePath: "img/cards/blue.png"},
-    4: {id: INNOCENT, imagePath: "img/cards/innocent.png"},
-    5: {id: ASSASSIN, imagePath: "img/cards/assassin.png"}
-}
+const DEFAULT = INNOCENT;
 
-const defaultCardType = cardTypes[INNOCENT];
+// ----------------------------------------------------------------------------------------------------
+// Import Data
 
+//? get words from json file
 const words = require('./words.json').map(a => a.toUpperCase());
 
+// ----------------------------------------------------------------------------------------------------
+// Caches for Rooms & Players
+
+//TODO - COMMENT THIS
 const rooms = {};
+const players = {};
 
-let round = 0;
+// ----------------------------------------------------------------------------------------------------
+// Handle Sockets
 
-app.get('/', (req, res) => {
-    res.setHeader('Content-Type', 'text/html');
-    res.sendFile(`${__dirname}/index.html`);
-});
-
+//TODO - OPTIMIZE
 io.on('connection', (socket) => {
-    // Socket Listeners
+    // Menu
     socket.on('create-room', (username) => createRoom(socket, username));
     socket.on('join-room', (room_id) => joinRoom(socket, room_id));
     socket.on('join-team', (username, team, room_id) => joinTeam(socket, username, team, room_id));
     socket.on('new-game', (room_id) => newGame(room_id));
-    socket.on('new-round', (room_id) => newRound(room_id));
     
     // ingame
+    socket.on('new-round', (room_id) => newRound(room_id));
     socket.on('guess-card', (pos, room_id) => guessCard(socket, pos, room_id));
     socket.on('give-clue', (clue, amount, sender, room_id) => giveClue(socket, clue, amount, sender, room_id));
 
@@ -50,53 +66,46 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => handleDisconnection(socket));
 });
 
+// ----------------------------------------------------------------------------------------------------
+// Handle Disconnection
+
+//? from a client
 function handleDisconnection(socket) {
     getRoomIds().forEach(room_id => {
+        // Delete any players with the id of the disconnect player
         delete getPlayers(room_id)[socket.id];
+
+        // Notify all members that someone's left
         if (Object.keys(getPlayers(room_id)).length) {
             io.to(room_id).emit('update-players', getPlayers(room_id));
-        } else {
-            delete getRoom(room_id);
+            return;
         }
+
+        // Delete empty rooms
+        delete getRoom(room_id);
     });
 }
 
-function setIds(arr, num, id) {
-    i = 0;
-    while (i < num) {
-        let elem = rand(0, 25);
+// ----------------------------------------------------------------------------------------------------
+// Handle Creating & Joining Rooms
 
-        if (arr[elem] != defaultCardType.id) continue;
-
-        arr[elem] = id;
-        i++;
-    }
-    return arr;
+//TODO - OPTIMIZE
+function newRoom(id) {
+    rooms[id] = {id: id, players: {}, data: {first: randInt(2)}, cards: []};
+    return id;
 }
 
-function randFrom(arr, count) {
-    let rand_arr = [];
-    i = 0;
-    while (i < count) {
-        rand_elem = arr[Math.floor(Math.random() * arr.length)];
-        if (rand_arr.includes(rand_elem)) continue;
-        rand_arr.push(rand_elem);
-        i++;
-    }
-    return rand_arr;
-}
-
-function rand(min, max) {
-    return Math.floor(Math.random() * (max - min) + min);
-}
-
+//TODO - OPTIMIZE
+//? from a client
 function createRoom(socket) {
-    do { var room_id = rand(100, 999);
-    } while (getRoomIds().includes(room_id.toString()));
+    do { var roomId = randIntBetween(100, 999);
+    } while (getRoomIds().includes(roomId.toString()));
     
-    joinRoom(socket, newRoom(room_id), true);
+    joinRoom(socket, newRoom(roomId), true);
 }
 
+//TODO - OPTIMIZE
+//? from a client
 function joinRoom(socket, room_id, host = false) {
     if (rooms[room_id] == null) return;
     if (!host && Array.from(io.sockets.adapter.rooms.get(room_id.toString())).length >= 4) return;
@@ -109,34 +118,62 @@ function joinRoom(socket, room_id, host = false) {
     socket.emit('update-players', getPlayers(room_id));
 }
 
+//TODO - OPTIMIZE
+//? from a client
 function joinTeam(socket, username, team, room_id) {
+    const roomPlayers = getPlayers(room_id);
 
-    const players = getPlayers(room_id);
+    // Add player to room
+    roomPlayers[socket.id] = {name: username, team: team};
 
-    // add player to room
-    players[socket.id] = {name: username, team: team};
-
-    // tell players about the new player that joined
-    io.to(room_id.toString()).emit('update-players', players);
+    // Tell players about the new player that joined
+    io.to(room_id.toString()).emit('update-players', roomPlayers);
 }
 
+// ----------------------------------------------------------------------------------------------------
+// Start a New Game
+
+//TODO - OPTIMIZE
+//? from a client
 function newGame(room_id) {
     io.to(room_id.toString()).emit('new-game', getPlayers(room_id));
 }
 
+// ----------------------------------------------------------------------------------------------------
+// Start a New Round
+
+//TODO - OPTIMIZE
+function setIds(arr, num, id) {
+    i = 0;
+    while (i < num) {
+        let elem = randInt(25);
+
+        if (arr[elem] != DEFAULT) continue;
+
+        arr[elem] = id;
+        i++;
+    }
+    return arr;
+}
+
+//TODO - OPTIMIZE
+//? from a client
 function newRound(room_id) {
-    // create layout ids
+    // Change which team goes first
+    getRoom(room_id).data.first = (getRoom(room_id).data.first == RED) ? BLUE : RED;
+
+    // Create layout ids
     let card_ids = setIds( setIds( setIds( setIds(
-        Array(25).fill(defaultCardType.id), 
+        Array(25).fill(DEFAULT), 
         8, RED ),
         8, BLUE ),
-        1, round%2 == 0 ? RED : BLUE ),
+        1, getRoom(room_id).data.first ),
         1, ASSASSIN );
 
-    // create layout texts
+    // Create layout texts
     let card_texts = randFrom(words, 25);
 
-    // combine ids and texts
+    // Combine ids and texts
     cards = [];
     for (let i = 0; i < 25; i++) {
         cards.push({
@@ -146,16 +183,18 @@ function newRound(room_id) {
         });
     }
 
-    // increment round
-    round++;
-
-    // add cards to room
+    // Add cards to room
     getRoom(room_id).cards = cards;
     
-    // broadcast new layout
-    io.to(room_id.toString()).emit('new-round', getRoom(room_id).cards, getPlayers(room_id), round);
+    // Broadcast new layout
+    io.to(room_id.toString()).emit('new-round', getRoom(room_id).cards, getPlayers(room_id));
 }
 
+// ----------------------------------------------------------------------------------------------------
+// Handle Guessing Cards
+
+//TODO - OPTIMIZE
+//? from a client
 function guessCard(socket, pos, room_id) {
     const arr = ['a', 'b', 'c', 'd', 'e'];
     const card_index = arr.indexOf(pos.charAt(0)) + (parseInt(pos.charAt(1)) - 1) * 5;
@@ -166,15 +205,25 @@ function guessCard(socket, pos, room_id) {
     io.to(room_id.toString()).emit('cover-card', pos, card.id);
 }
 
+// ----------------------------------------------------------------------------------------------------
+// Handle Giving Clues
+
+//TODO - OPTIMIZE
+//? from a client
 function giveClue(socket, clue, amount, sender, room_id) {
     io.to(room_id.toString()).emit('recive-clue', clue.toUpperCase(), amount, sender);
 }
 
-function newRoom(id) {
-    rooms[id] = {id: id, players: {}, data: {round: 0}, cards: []};
-    return id;
-}
+// ----------------------------------------------------------------------------------------------------
+// 
+// ----------------------------------------------------------------------------------------------------
+// 
+// ----------------------------------------------------------------------------------------------------
+// 
+// ----------------------------------------------------------------------------------------------------
+// Room Functions
 
+//TODO - OPTIMIZE
 function getRoom(id) {
     const room = rooms[id];
 
@@ -193,6 +242,6 @@ function getRoomIds() {
     return Object.keys(rooms);
 }
 
-http.listen(port, () => {
-    console.log(`Socket.IO server running at http://localhost:${port}/`);
-});
+// ----------------------------------------------------------------------------------------------------
+
+
