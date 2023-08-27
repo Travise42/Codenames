@@ -98,35 +98,35 @@ const players = {};
 // Handle Sockets
 
 //TODO - OPTIMIZE
-io.on('connection', (socket) => {
+io.on('connection', (client) => {
 
     // Menu
-    socket.on('create-room', (nickname) => createRoom(socket, nickname));
-    socket.on('join-room', (room, nickname) => joinRoom(socket, room, nickname, false));
-    socket.on('join-team', (team) => joinTeam(socket, team));
-    socket.on('new-game', () => newGame(socket));
+    client.on('create-room', (nickname) => createRoom(client, nickname));
+    client.on('join-room', (room, nickname) => joinRoom(client, room, nickname, false));
+    client.on('join-team', (team) => joinTeam(client, team));
+    client.on('new-game', () => newGame(client));
     
     // ingame
-    socket.on('new-round', () => newRound(socket));
-    socket.on('guess-card', (pos) => guessCard(socket, pos));
-    socket.on('give-clue', (clue, amount, sender) => giveClue(socket, clue, amount, sender));
+    client.on('new-round', () => newRound(client));
+    client.on('guess-card', (pos) => guessCard(client, pos));
+    client.on('give-clue', (clue, amount, sender) => giveClue(client, clue, amount, sender));
 
     // leaving game
-    socket.on('disconnect', () => handleDisconnection(socket));
+    client.on('disconnect', () => handleDisconnection(client));
 });
 
 // ----------------------------------------------------------------------------------------------------
 // Handle Disconnection
 
 //? from a client
-function handleDisconnection(socket) {
+function handleDisconnection(client) {
     // Get room code of disconnect player
-    if (players[socket.id] == null) return;
-    const roomCode = getRoomCode(socket);
+    if (players[client.id] == null) return;
+    const roomCode = getRoomCode(client);
     if (roomCode == null) return;
 
     // Delete any players with the id of the disconnect player
-    delete getIdsOfPlayersIn(roomCode)[socket.id];
+    delete getIdsOfPlayersIn(roomCode)[client.id];
 
     // Notify all members that someone left
     if (getIdsOfPlayersIn(roomCode).length) {
@@ -142,7 +142,7 @@ function handleDisconnection(socket) {
 // Handle Creating & Joining Rooms
 
 // Add player to cached players
-function cachePlayer(socket, roomCode, nickname) {
+function cachePlayer(client, roomCode, nickname) {
     /*
     <player-id>: {
         id: <player-id>,
@@ -150,8 +150,8 @@ function cachePlayer(socket, roomCode, nickname) {
         name: <player-name>
     }
     */
-    players[socket.id] = {
-        id: socket.id,
+    players[client.id] = {
+        id: client.id,
         room: roomCode,
         name: nickname
     };
@@ -197,45 +197,45 @@ function newRoom(roomCode) {
 
 //TODO - OPTIMIZE
 //? from a client
-function createRoom(socket, nickname) {
+function createRoom(client, nickname) {
     do { var roomCode = randIntBetween(0, 10).toString() + randIntBetween(0, 10).toString() + randIntBetween(0, 10).toString();
     } while (getRoomCodes().includes(roomCode));
     
-    joinRoom(socket, newRoom(roomCode), nickname, true);
+    joinRoom(client, newRoom(roomCode), nickname, true);
 }
 
 //TODO - OPTIMIZE
 //? from a client
-function joinRoom(socket, roomCode, nickname, isHost = false) {
+function joinRoom(client, roomCode, nickname, isHost = false) {
     if (rooms[roomCode] == null) return;
     if (!isHost && Array.from(io.sockets.adapter.rooms.get(roomCode)).length >= 4) return;
 
     // Add player to room
-    socket.join(roomCode);
-    cachePlayer(socket, roomCode, nickname);
+    client.join(roomCode);
+    cachePlayer(client, roomCode, nickname);
 
     // Announce to new player that they have joined
-    socket.emit('joined-room', roomCode, isHost);
-    socket.emit('update-players', getNamesOfPlayersIn(roomCode, RED), getNamesOfPlayersIn(roomCode, BLUE));
+    client.emit('joined-room', roomCode, isHost);
+    client.emit('update-players', getNamesOfPlayersIn(roomCode, RED), getNamesOfPlayersIn(roomCode, BLUE));
 }
 
 //TODO - OPTIMIZE
 //? from a client
-function joinTeam(socket, team) {
-    const roomCode = getRoomCode(socket);
+function joinTeam(client, team) {
+    const roomCode = getRoomCode(client);
 
     // Set player team
-    getPlayer(socket).team = team;
+    getPlayer(client).team = team;
 
     // Remove player from the team they left
-    const i = getRoom(roomCode).players.indexOf(socket.id);
+    const i = getRoom(roomCode).players.indexOf(client.id);
     if (i != -1) {
         getRoom(roomCode).players.splice(i, 1);
     }
 
     // Add player to room
-    if (getPlayer(socket).team == RED) getRoom(roomCode).players.unshift(getPlayer(socket).id);
-    else getRoom(roomCode).players.push(getPlayer(socket).id);
+    if (getPlayer(client).team == RED) getRoom(roomCode).players.unshift(getPlayer(client).id);
+    else getRoom(roomCode).players.push(getPlayer(client).id);
 
     // Tell players about the new player that joined
     io.to(roomCode).emit('update-players', getNamesOfPlayersIn(roomCode, RED), getNamesOfPlayersIn(roomCode, BLUE));
@@ -246,8 +246,8 @@ function joinTeam(socket, team) {
 
 //TODO - OPTIMIZE
 //? from a client
-function newGame(socket) {
-    const roomCode = getRoomCode(socket);
+function newGame(client) {
+    const roomCode = getRoomCode(client);
     io.to(roomCode).emit('new-game', getNamesOfPlayersIn(roomCode));
 }
 
@@ -270,8 +270,8 @@ function setCards(cards, amount, id) {
 
 //TODO - OPTIMIZE
 //? from a client
-function newRound(socket) {
-    const roomCode = getRoomCode(socket);
+function newRound(client) {
+    const roomCode = getRoomCode(client);
     // Change which team goes first
     getRoom(roomCode).first = (getRoom(roomCode).first == RED) ? BLUE : RED;
 
@@ -316,9 +316,9 @@ function newRound(socket) {
 
 //TODO - OPTIMIZE
 //? from a client
-function guessCard(socket, pos) {
+function guessCard(client, pos) {
     // Get room code
-    const roomCode = getRoomCode(socket);
+    const roomCode = getRoomCode(client);
 
     // Get guessed card
     const card = getRoom(roomCode).cards[pos];
@@ -334,9 +334,9 @@ function guessCard(socket, pos) {
 
 //TODO - OPTIMIZE
 //? from a client
-function giveClue(socket, clue, amount, sender) {
+function giveClue(client, clue, amount, sender) {
     // Get room code
-    const roomCode = getRoomCode(socket);
+    const roomCode = getRoomCode(client);
 
     /* //TODO deal with hackers using this code
     if (!clue_element.value) return;
@@ -370,19 +370,19 @@ function giveClue(socket, clue, amount, sender) {
 // ----------------------------------------------------------------------------------------------------
 // Room Functions
 
-function getPlayer(socket) {
-    const player = players[socket.id]
+function getPlayer(client) {
+    const player = players[client.id]
     if (player != null) return player;
 
-    console.log(`ERROR || Player not found:\nPlayer id of ${socket.id} does not exist`);
-    return {id: socket.id, room: null, name: '<<<ERROR>>>'};
+    console.log(`ERROR || Player not found:\nPlayer id of ${client.id} does not exist`);
+    return {id: client.id, room: null, name: '<<<ERROR>>>'};
 }
 
-function getRoomCode(socket) {
-    const player = players[socket.id]
+function getRoomCode(client) {
+    const player = players[client.id]
     if (player != null) return player.room;
 
-    console.log(`ERROR || Player not found:\nPlayer id of ${socket.id} does not exist`);
+    console.log(`ERROR || Player not found:\nPlayer id of ${client.id} does not exist`);
     return null;
 }
 

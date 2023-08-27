@@ -15,9 +15,15 @@ const cardTypes = {
 
 const defaultCardType = cardTypes[INNOCENT];
 
-const socket = io();
+const client = io();
 
-const user = {name: undefined, roomCode: undefined, isHost: undefined, team: undefined, isCodeMaster: undefined};
+const user = {
+    name: undefined,
+    roomCode: undefined,
+    isHost: undefined,
+    team: undefined,
+    isCodeMaster: undefined
+};
 
 const TOP_LEFT = 0;
 const BOTTOM_LEFT = 1;
@@ -110,7 +116,7 @@ function createHomeScreen() {
     // Create join room button
     const join_room_button = newElem('button', null, 'join-room-button');
     join_room_button.textContent = 'Join Room';
-    join_room_button.addEventListener('click', () => socket.emit('join-room', join_room_input.value, user.name));
+    join_room_button.addEventListener('click', () => client.emit('join-room', join_room_input.value, user.name));
 
     addChild(join_room_contianer, join_room_button);
 
@@ -122,7 +128,7 @@ function createHomeScreen() {
 
     const create_room_button = newElem('button', null, 'create-room-button');
     create_room_button.textContent = 'Create Room';
-    create_room_button.addEventListener('click', () => socket.emit('create-room', user.name));
+    create_room_button.addEventListener('click', () => client.emit('create-room', user.name));
 
     addChild(create_room_contianer, create_room_button);
 
@@ -131,7 +137,7 @@ function createHomeScreen() {
 
 }
 
-socket.on('joined-room', (roomId, isHost) => {
+client.on('joined-room', (roomId, isHost) => {
     // Set room id and host value
     user.roomCode = roomId;
     user.isHost = isHost;
@@ -234,16 +240,16 @@ function createRoomScreen() {
     addChild(main_container, play_button_contianer);
 
     // add click functionality to play button
-    play_button.addEventListener('click', () => socket.emit('new-game'));
+    play_button.addEventListener('click', () => client.emit('new-game'));
 }
 
 function joinTeam(team) {
     user.team = team;
-    socket.emit('join-team', user.team);
+    client.emit('join-team', user.team);
 }
 
 // TODO do this without IDs
-socket.on('update-players', (redTeam, blueTeam) => updatePlayerLists(redTeam, blueTeam));
+client.on('update-players', (redTeam, blueTeam) => updatePlayerLists(redTeam, blueTeam));
 function updatePlayerLists(redTeam, blueTeam) {
 
     // Get main container
@@ -283,8 +289,7 @@ function updatePlayerLists(redTeam, blueTeam) {
     }
 }
 
-// TODO do this without IDs
-socket.on('new-game', playerNames => initGame(playerNames));
+client.on('new-game', playerNames => initGame(playerNames));
 function initGame(playerNames) {
     removeLobbyScreen();
     definePlayerRolls(playerNames)
@@ -295,7 +300,9 @@ function initGame(playerNames) {
 function removeLobbyScreen() {
     document.querySelector('.red-players-container').remove();
     document.querySelector('.blue-players-container').remove();
+
     if (!user.isHost) return;
+
     document.querySelector('.play-button-container').remove();
 }
 
@@ -327,7 +334,7 @@ function createGameScreen() {
     // Create flip button
     const flip_button = newElem('button', null, 'flip-button');
     flip_button.textContent = 'Flip';
-    flip_button.addEventListener("click", () => socket.emit('new-round', user.roomCode));
+    flip_button.addEventListener("click", () => client.emit('new-round', user.roomCode));
 
     addChild(flip_button_container, flip_button);
 
@@ -503,7 +510,7 @@ function getFreePos() {
     return openContainers[0].className;
 }
 
-socket.on('new-round', (cards, isCodeMaster) => {
+client.on('new-round', (cards, isCodeMaster) => {
     user.isCodeMaster = isCodeMaster;
     newRound(cards);
 });
@@ -571,10 +578,10 @@ function editCards(cards) {
 }
 
 function guessCard(pos) {
-    socket.emit('guess-card', pos);
+    client.emit('guess-card', pos);
 }
 
-socket.on('cover-card', (pos, id) => {
+client.on('cover-card', (pos, id) => {
     const card_pos = document.getElementById(pos);
     const card = card_pos.firstChild;
     const inner = card.firstChild;
@@ -614,11 +621,11 @@ function giveClue() {
         return;
     }
 
-    socket.emit('give-clue', clue_element.value, amount_element.value, {name: user.name, team: user.team});
+    client.emit('give-clue', clue_element.value, amount_element.value, {name: user.name, team: user.team});
     clue_element.value = '';
 }
 
-socket.on('recive-clue', (clue, amount, sender) => {
+client.on('recive-clue', (clue, amount, sender) => {
     // get game log
     const game_log = document.getElementById('game-log');
 
