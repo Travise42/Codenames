@@ -33,6 +33,13 @@ const ASSASSIN = 5;
 
 const DEFAULT = INNOCENT;
 
+const RED_CODEMASTER = 0;
+const RED_OPPERATIVE = 1;
+const BLUE_CODEMASTER = 2;
+const BLUE_OPPERATIVE = 3;
+
+const COLUMNS = ['a', 'b', 'c', 'd', 'e'];
+
 // ----------------------------------------------------------------------------------------------------
 // Import Data
 
@@ -42,8 +49,49 @@ const words = require('./words.json').map(a => a.toUpperCase());
 // ----------------------------------------------------------------------------------------------------
 // Caches for Rooms & Players
 
-//TODO - COMMENT THIS
+/*
+rooms: {
+    <room-code>: {
+        code: <room-code>,
+        players: [
+            <red-codemaster-id>,
+            <red-opperative-id>,
+            <blue-codemaster-id>,
+            <blue-opperative-id>
+        ],
+        cards: {
+            'a1': {
+                pos: 'a1',
+                id: <card-id>,
+                text: <card-text>,
+                covered: <true/false>
+            }
+            .
+            .
+            .
+        },
+        turn: <turn-id>,
+        first: <team-going-first>
+    }
+    .
+    .
+    .
+}
+*/
 const rooms = {};
+
+/*
+players: {
+    <player-id>: {
+        id: <player-id>,
+        room: <room-code>,
+        name: <player-name>
+    }
+    .
+    .
+    .
+}
+*/
 const players = {};
 
 // ----------------------------------------------------------------------------------------------------
@@ -51,16 +99,17 @@ const players = {};
 
 //TODO - OPTIMIZE
 io.on('connection', (socket) => {
+
     // Menu
-    socket.on('create-room', (username) => createRoom(socket, username));
-    socket.on('join-room', (room_id) => joinRoom(socket, room_id));
-    socket.on('join-team', (username, team, room_id) => joinTeam(socket, username, team, room_id));
-    socket.on('new-game', (room_id) => newGame(room_id));
+    socket.on('create-room', (nickname) => createRoom(socket, nickname));
+    socket.on('join-room', (room, nickname) => joinRoom(socket, room, nickname, false));
+    socket.on('join-team', (team) => joinTeam(socket, team));
+    socket.on('new-game', () => newGame(socket));
     
     // ingame
-    socket.on('new-round', (room_id) => newRound(room_id));
-    socket.on('guess-card', (pos, room_id) => guessCard(socket, pos, room_id));
-    socket.on('give-clue', (clue, amount, sender, room_id) => giveClue(socket, clue, amount, sender, room_id));
+    socket.on('new-round', () => newRound(socket));
+    socket.on('guess-card', (pos) => guessCard(socket, pos));
+    socket.on('give-clue', (clue, amount, sender) => giveClue(socket, clue, amount, sender));
 
     // leaving game
     socket.on('disconnect', () => handleDisconnection(socket));
@@ -71,63 +120,125 @@ io.on('connection', (socket) => {
 
 //? from a client
 function handleDisconnection(socket) {
-    getRoomIds().forEach(room_id => {
-        // Delete any players with the id of the disconnect player
-        delete getPlayers(room_id)[socket.id];
+    // Get room code of disconnect player
+    if (players[socket.id] == null) return;
+    const roomCode = getRoomCode(socket);
+    if (roomCode == null) return;
 
-        // Notify all members that someone's left
-        if (Object.keys(getPlayers(room_id)).length) {
-            io.to(room_id).emit('update-players', getPlayers(room_id));
-            return;
-        }
+    // Delete any players with the id of the disconnect player
+    delete getIdsOfPlayersIn(roomCode)[socket.id];
 
-        // Delete empty rooms
-        delete getRoom(room_id);
-    });
+    // Notify all members that someone left
+    if (getIdsOfPlayersIn(roomCode).length) {
+        io.to(roomCode).emit('update-players', getNamesOfPlayersIn(roomCode, RED), getNamesOfPlayersIn(roomCode, BLUE));
+        return;
+    }
+
+    // Delete empty rooms
+    delete getRoom(roomCode);
 }
 
 // ----------------------------------------------------------------------------------------------------
 // Handle Creating & Joining Rooms
 
-//TODO - OPTIMIZE
-function newRoom(id) {
-    rooms[id] = {id: id, players: {}, data: {first: randInt(2)}, cards: []};
-    return id;
+// Add player to cached players
+function cachePlayer(socket, roomCode, nickname) {
+    /*
+    <player-id>: {
+        id: <player-id>,
+        room: <room-code>,
+        name: <player-name>
+    }
+    */
+    players[socket.id] = {
+        id: socket.id,
+        room: roomCode,
+        name: nickname
+    };
+}
+
+function newRoom(roomCode) {
+    rooms[roomCode] = {code: roomCode, players: [], cards: {}, first: randInt(2)};
+
+    /*
+    cards: {
+        a1: {
+            pos: 'a1',
+            id: <card-id>,
+            text: <card-text>,
+            covered: <true/false>
+        }
+        .
+        .
+        .
+        e5: {
+            pos: 'e5',
+            id: <card-id>,
+            text: <card-text>,
+            covered: <true/false>
+        }
+    }
+    */
+
+    COLUMNS.forEach(column => {
+        for (let row = 1; row <= 5; row++) {
+            let pos = column + row;
+            rooms[roomCode].cards[pos] = {
+                pos: pos,
+                id: 4,
+                text: '',
+                covered: false
+            }
+        }
+    });
+
+    return roomCode;
 }
 
 //TODO - OPTIMIZE
 //? from a client
-function createRoom(socket) {
-    do { var roomId = randIntBetween(100, 999);
-    } while (getRoomIds().includes(roomId.toString()));
+function createRoom(socket, nickname) {
+    do { var roomCode = randIntBetween(0, 10).toString() + randIntBetween(0, 10).toString() + randIntBetween(0, 10).toString();
+    } while (getRoomCodes().includes(roomCode));
     
-    joinRoom(socket, newRoom(roomId), true);
+    joinRoom(socket, newRoom(roomCode), nickname, true);
 }
 
 //TODO - OPTIMIZE
 //? from a client
-function joinRoom(socket, room_id, host = false) {
-    if (rooms[room_id] == null) return;
-    if (!host && Array.from(io.sockets.adapter.rooms.get(room_id.toString())).length >= 4) return;
-
-    // add player to room
-    socket.join(room_id.toString());
-
-    // announce to new player that they have joined
-    socket.emit('joined-room', room_id, host);
-    socket.emit('update-players', getPlayers(room_id));
-}
-
-//TODO - OPTIMIZE
-//? from a client
-function joinTeam(socket, username, team, room_id) {
-    const roomPlayers = getPlayers(room_id);
+function joinRoom(socket, roomCode, nickname, isHost = false) {
+    if (rooms[roomCode] == null) return;
+    if (!isHost && Array.from(io.sockets.adapter.rooms.get(roomCode)).length >= 4) return;
 
     // Add player to room
-    roomPlayers[socket.id] = {name: username, team: team};
+    socket.join(roomCode);
+    cachePlayer(socket, roomCode, nickname);
+
+    // Announce to new player that they have joined
+    socket.emit('joined-room', roomCode, isHost);
+    socket.emit('update-players', getNamesOfPlayersIn(roomCode, RED), getNamesOfPlayersIn(roomCode, BLUE));
+}
+
+//TODO - OPTIMIZE
+//? from a client
+function joinTeam(socket, team) {
+    const roomCode = getRoomCode(socket);
+
+    // Set player team
+    getPlayer(socket).team = team;
+
+    // Remove player from the team they left
+    const i = getRoom(roomCode).players.indexOf(socket.id);
+    if (i != -1) {
+        getRoom(roomCode).players.splice(i, 1);
+    }
+
+    // Add player to room
+    if (getPlayer(socket).team == RED) getRoom(roomCode).players.unshift(getPlayer(socket).id);
+    else getRoom(roomCode).players.push(getPlayer(socket).id);
 
     // Tell players about the new player that joined
-    io.to(room_id.toString()).emit('update-players', roomPlayers);
+    io.to(roomCode).emit('update-players', getNamesOfPlayersIn(roomCode, RED), getNamesOfPlayersIn(roomCode, BLUE));
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -135,59 +246,69 @@ function joinTeam(socket, username, team, room_id) {
 
 //TODO - OPTIMIZE
 //? from a client
-function newGame(room_id) {
-    io.to(room_id.toString()).emit('new-game', getPlayers(room_id));
+function newGame(socket) {
+    const roomCode = getRoomCode(socket);
+    io.to(roomCode).emit('new-game', getNamesOfPlayersIn(roomCode));
 }
 
 // ----------------------------------------------------------------------------------------------------
 // Start a New Round
 
 //TODO - OPTIMIZE
-function setIds(arr, num, id) {
+function setCards(cards, amount, id) {
     i = 0;
-    while (i < num) {
-        let elem = randInt(25);
+    while (i < amount) {
+        let cardIndex = randInt(25);
 
-        if (arr[elem] != DEFAULT) continue;
+        if (cards[cardIndex] != DEFAULT) continue;
 
-        arr[elem] = id;
+        cards[cardIndex] = id;
         i++;
     }
-    return arr;
+    return cards;
 }
 
 //TODO - OPTIMIZE
 //? from a client
-function newRound(room_id) {
+function newRound(socket) {
+    const roomCode = getRoomCode(socket);
     // Change which team goes first
-    getRoom(room_id).data.first = (getRoom(room_id).data.first == RED) ? BLUE : RED;
+    getRoom(roomCode).first = (getRoom(roomCode).first == RED) ? BLUE : RED;
 
+    // Change who is code master
+    const players = getRoom(roomCode).players;
+    var temp = [players[1], players[0], players[3], players[2]];
+    players[0] = temp[0]; players[1] = temp[1]; players[2] = temp[2]; players[3] = temp[3];
+    
     // Create layout ids
-    let card_ids = setIds( setIds( setIds( setIds(
+    const cardIds = setCards( setCards( setCards( setCards(
         Array(25).fill(DEFAULT), 
         8, RED ),
         8, BLUE ),
-        1, getRoom(room_id).data.first ),
+        1, getRoom(roomCode).first ),
         1, ASSASSIN );
 
     // Create layout texts
-    let card_texts = randFrom(words, 25);
+    const card_texts = randFrom(words, 25);
 
     // Combine ids and texts
-    cards = [];
-    for (let i = 0; i < 25; i++) {
-        cards.push({
-            id: card_ids[i],
+    const cards = getRoom(roomCode).cards;
+    Object.keys(cards).forEach((pos, i) => {
+        cards[pos] = {
+            pos: pos,
+            id: cardIds[i],
             text: card_texts[i],
             covered: false
-        });
-    }
-
-    // Add cards to room
-    getRoom(room_id).cards = cards;
+        }
+    });
     
     // Broadcast new layout
-    io.to(room_id.toString()).emit('new-round', getRoom(room_id).cards, getPlayers(room_id));
+    getIdsOfPlayersIn(roomCode).forEach(playerId => {
+        const alteredCards = Object.values(cards).map(card => ({...card}));
+        const codeMaster = (players[RED_CODEMASTER] == playerId || players[BLUE_CODEMASTER] == playerId);
+        if (!codeMaster) alteredCards.forEach(card => card.id = 4);
+        io.to(playerId).emit('new-round', alteredCards, codeMaster);
+    });
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -195,14 +316,17 @@ function newRound(room_id) {
 
 //TODO - OPTIMIZE
 //? from a client
-function guessCard(socket, pos, room_id) {
-    const arr = ['a', 'b', 'c', 'd', 'e'];
-    const card_index = arr.indexOf(pos.charAt(0)) + (parseInt(pos.charAt(1)) - 1) * 5;
-    const card = getRoom(room_id).cards[card_index]
+function guessCard(socket, pos) {
+    // Get room code
+    const roomCode = getRoomCode(socket);
+
+    // Get guessed card
+    const card = getRoom(roomCode).cards[pos];
     if (card == null || card.covered) return;
+
+    // Cover guessed card
     card.covered = true;
-    //socket.emit('end-of-turn');
-    io.to(room_id.toString()).emit('cover-card', pos, card.id);
+    io.to(roomCode).emit('cover-card', pos, card.id);
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -210,8 +334,31 @@ function guessCard(socket, pos, room_id) {
 
 //TODO - OPTIMIZE
 //? from a client
-function giveClue(socket, clue, amount, sender, room_id) {
-    io.to(room_id.toString()).emit('recive-clue', clue.toUpperCase(), amount, sender);
+function giveClue(socket, clue, amount, sender) {
+    // Get room code
+    const roomCode = getRoomCode(socket);
+
+    /* //TODO deal with hackers using this code
+    if (!clue_element.value) return;
+
+    const card_poses = Array.from(document.querySelector('.card-container').children);
+    const duplicates = [];
+    card_poses.forEach((card_pos) => {
+        const card = card_pos.firstChild;
+        const inner = card.firstChild;
+        if (inner.lastChild.className == 'card-cover') return;
+        removeClass(card_pos, 'invalid');
+        if (clue_element.value.toLowerCase() == inner.firstChild.lastChild.textContent.toLowerCase()) duplicates.push(card_pos);
+    });
+    if (duplicates.length) {
+        duplicates.forEach((card_pos) => {
+            addClass(card_pos, 'invalid');
+        });
+        return;
+    }
+    */
+
+    io.to(roomCode).emit('recive-clue', clue.toUpperCase(), amount, sender);
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -223,22 +370,44 @@ function giveClue(socket, clue, amount, sender, room_id) {
 // ----------------------------------------------------------------------------------------------------
 // Room Functions
 
+function getPlayer(socket) {
+    const player = players[socket.id]
+    if (player != null) return player;
+
+    console.log(`ERROR || Player not found:\nPlayer id of ${socket.id} does not exist`);
+    return {id: socket.id, room: null, name: '<<<ERROR>>>'};
+}
+
+function getRoomCode(socket) {
+    const player = players[socket.id]
+    if (player != null) return player.room;
+
+    console.log(`ERROR || Player not found:\nPlayer id of ${socket.id} does not exist`);
+    return null;
+}
+
 //TODO - OPTIMIZE
-function getRoom(id) {
-    const room = rooms[id];
+function getRoom(roomCode) {
+    const room = rooms[roomCode];
+    if (room != null) return room;
 
-    if (room == null) {
-        console.log(`ERROR || Room not found:\nRoom id of ${id} does not exist`);
-        return {id: id, players: {}, data: {round: 0}, cards: []};
+    console.log(`ERROR || Room not found:\nRoom code of ${roomCode} does not exist`);
+    return {code: roomCode, players: [], cards: {}, first: 0};
+}
+
+function getIdsOfPlayersIn(roomCode) {
+    return getRoom(roomCode).players;
+}
+
+function getNamesOfPlayersIn(roomCode, team = null) {
+    if (team == null) {
+        return getIdsOfPlayersIn(roomCode).map(playerId => players[playerId].name);
     }
-    return room;
+
+    return getIdsOfPlayersIn(roomCode).filter(playerId => players[playerId].team == team ).map(playerId => players[playerId].name);
 }
 
-function getPlayers(id) {
-    return getRoom(id).players;
-}
-
-function getRoomIds() {
+function getRoomCodes() {
     return Object.keys(rooms);
 }
 

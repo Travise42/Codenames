@@ -17,14 +17,19 @@ const defaultCardType = cardTypes[INNOCENT];
 
 const socket = io();
 
-const user = {nickname: undefined, roomId: undefined, isHost: undefined, team: undefined, isCodeMaster: undefined};
+const user = {name: undefined, roomCode: undefined, isHost: undefined, team: undefined, isCodeMaster: undefined};
 
 const TOP_LEFT = 0;
-const TOP_RIGHT = 1;
-const BOTTOM_LEFT = 2;
+const BOTTOM_LEFT = 1;
+const TOP_RIGHT = 2;
 const BOTTOM_RIGHT = 3;
 
-const players = [undefined, undefined, undefined, user.nickname];
+const RED_CODEMASTER = 0;
+const RED_OPPERATIVE = 1;
+const BLUE_CODEMASTER = 2;
+const BLUE_OPPERATIVE = 3;
+
+const players = [undefined, undefined, undefined, user.name];
 
 /*
 NameScreen ->   HomeScreen ->   LobbyScreen ->  GameScreen ->   EndScreen
@@ -76,7 +81,7 @@ function submitName(inputedName) {
     if (!inputedName) return;
 
     // Set nickname to inputed value
-    user.nickname = inputedName;
+    user.name = inputedName;
 
     // Create home screen
     removeNameInput();
@@ -105,7 +110,7 @@ function createHomeScreen() {
     // Create join room button
     const join_room_button = newElem('button', null, 'join-room-button');
     join_room_button.textContent = 'Join Room';
-    join_room_button.addEventListener('click', () => socket.emit('join-room', join_room_input.value));
+    join_room_button.addEventListener('click', () => socket.emit('join-room', join_room_input.value, user.name));
 
     addChild(join_room_contianer, join_room_button);
 
@@ -117,7 +122,7 @@ function createHomeScreen() {
 
     const create_room_button = newElem('button', null, 'create-room-button');
     create_room_button.textContent = 'Create Room';
-    create_room_button.addEventListener('click', () => socket.emit('create-room'));
+    create_room_button.addEventListener('click', () => socket.emit('create-room', user.name));
 
     addChild(create_room_contianer, create_room_button);
 
@@ -128,7 +133,7 @@ function createHomeScreen() {
 
 socket.on('joined-room', (roomId, isHost) => {
     // Set room id and host value
-    user.roomId = roomId;
+    user.roomCode = roomId;
     user.isHost = isHost;
 
     // Create Looby screen
@@ -155,7 +160,7 @@ function createRoomScreen() {
 
     // Create room code header
     const room_code_header = newElem('h2');
-    room_code_header.textContent = user.roomId;
+    room_code_header.textContent = user.roomCode;
 
     addChild(room_code_container, room_code_header);
 
@@ -229,17 +234,17 @@ function createRoomScreen() {
     addChild(main_container, play_button_contianer);
 
     // add click functionality to play button
-    play_button.addEventListener('click', () => socket.emit('new-game', user.roomId));
+    play_button.addEventListener('click', () => socket.emit('new-game'));
 }
 
 function joinTeam(team) {
     user.team = team;
-    socket.emit('join-team', user.nickname, user.team, user.roomId);
+    socket.emit('join-team', user.team);
 }
 
 // TODO do this without IDs
-socket.on('update-players', players => updatePlayerLists(players));
-function updatePlayerLists(players) {
+socket.on('update-players', (redTeam, blueTeam) => updatePlayerLists(redTeam, blueTeam));
+function updatePlayerLists(redTeam, blueTeam) {
 
     // Get main container
     const main_container = document.querySelector('.main');
@@ -255,27 +260,19 @@ function updatePlayerLists(players) {
     join_blue_button.disabled = (user.team == BLUE);
     
     document.querySelectorAll('.room-player').forEach(li => li.remove());
-    
-    Object.entries(players).forEach(([player_id, player_data]) => {
-        const li = newElem('li', 'room-player');
-        li.textContent = player_data.name;
 
-        const id_meta = newElem('meta');
-        id_meta.name = "id";
-        id_meta.content = player_id;
-        
-        //const team_meta = newElem('meta');
-        //team_meta.name = "team";
-        //team_meta.content = player_data.team;
+    redTeam.forEach(playerName => {
+        const list_element = newElem('li', 'room-player');
+        list_element.textContent = playerName;
 
-        addChild(li, id_meta);
-        //addChild(li, team_meta);
+        addChild(red_players_list, list_element);
+    });
 
-        if (player_data.team == RED) {
-            addChild(red_players_list, li);
-        } else if (player_data.team == BLUE) {
-            addChild(blue_players_list, li);
-        }
+    blueTeam.forEach(playerName => {
+        const list_element = newElem('li', 'room-player');
+        list_element.textContent = playerName;
+
+        addChild(blue_players_list, list_element);
     });
 
     if (!user.isHost) return;
@@ -287,10 +284,10 @@ function updatePlayerLists(players) {
 }
 
 // TODO do this without IDs
-socket.on('new-game', (players) => initGame(players));
-function initGame(players) {
+socket.on('new-game', playerNames => initGame(playerNames));
+function initGame(playerNames) {
     removeLobbyScreen();
-    definePlayerRolls(players)
+    definePlayerRolls(playerNames)
     createGameScreen();
     createCards();
 }
@@ -302,22 +299,18 @@ function removeLobbyScreen() {
     document.querySelector('.play-button-container').remove();
 }
 
-// TODO do this without IDs and use predefined roles from index.js
-function definePlayerRolls(playerData) {
-    // get you and your teamate
-    const teamates = Object.entries(playerData).filter(([player_id, player_data]) => player_data.team == user.team).sort(([a_id, a_data], [b_id, b_data]) => a_id - b_id);
+function definePlayerRolls(playerNames) {
+    const i = playerNames.indexOf(user.name);
 
-    // get your oppenents
-    const opponents = Object.entries(playerData).filter(([player_id, player_data]) => player_data.team != user.team).sort(([a_id, a_data], [b_id, b_data]) => a_id - b_id);
-
-    // place you in the bottom right
-    players[BOTTOM_RIGHT] = user.nickname;
-
-    const top = +(teamates[0][0] == socket.id);
-    const bottom = 1-top;
-    players[TOP_RIGHT] = teamates[top][1].name;
-    players[TOP_LEFT] = opponents[top][1].name;
-    players[BOTTOM_LEFT] = opponents[bottom][1].name;
+    f = d => {
+        if (i % 2) d = -d;
+        return (i + d + 4) % 4;
+    }
+    
+    players[TOP_LEFT] = playerNames[f(3)];
+    players[BOTTOM_LEFT] = playerNames[f(2)];
+    players[TOP_RIGHT] = playerNames[f(1)];
+    players[BOTTOM_RIGHT] = playerNames[i];
 }
 
 function createGameScreen() {
@@ -334,7 +327,7 @@ function createGameScreen() {
     // Create flip button
     const flip_button = newElem('button', null, 'flip-button');
     flip_button.textContent = 'Flip';
-    flip_button.addEventListener("click", () => socket.emit('new-round', user.roomId));
+    flip_button.addEventListener("click", () => socket.emit('new-round', user.roomCode));
 
     addChild(flip_button_container, flip_button);
 
@@ -510,9 +503,8 @@ function getFreePos() {
     return openContainers[0].className;
 }
 
-socket.on('new-round', (cards, players) => {
-    let team_members = Object.entries({...players}).filter(([key, value]) => value.team == user.team).sort((a, b) => a[0] - b[0]);
-    user.isCodeMaster = (user.isCodeMaster == null) ? team_members[0][0] == socket.id : !user.isCodeMaster;
+socket.on('new-round', (cards, isCodeMaster) => {
+    user.isCodeMaster = isCodeMaster;
     newRound(cards);
 });
 
@@ -568,18 +560,18 @@ function clearCovers() {
 }
 
 function editCards(cards) {
-    const card_elements = document.querySelectorAll('.card');
+    cards.forEach( card => {
+        const card_element = document.querySelector(`.card-pos-${card.pos}`).firstChild;
 
-    card_elements.forEach( (card_element, i) => {
         let card_back = getCardBack(card_element);
-        addBackID(card_back, user.isCodeMaster ? cards[i].id : defaultCardType.id);
+        addBackID(card_back, card.id);
         addBackImage(card_back);
-        addBackText(card_back, cards[i].text);
+        addBackText(card_back, card.text);
     });
 }
 
 function guessCard(pos) {
-    socket.emit('guess-card', pos, user.roomId);
+    socket.emit('guess-card', pos);
 }
 
 socket.on('cover-card', (pos, id) => {
@@ -622,7 +614,7 @@ function giveClue() {
         return;
     }
 
-    socket.emit('give-clue', clue_element.value, amount_element.value, {name: user.nickname, team: user.team}, user.roomId);
+    socket.emit('give-clue', clue_element.value, amount_element.value, {name: user.name, team: user.team});
     clue_element.value = '';
 }
 
