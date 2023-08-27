@@ -102,14 +102,14 @@ io.on('connection', (client) => {
 
     // Menu
     client.on('create-room', (nickname) => createRoom(client, nickname));
-    client.on('join-room', (room, nickname) => joinRoom(client, room, nickname, false));
+    client.on('join-room', (roomCode, nickname) => joinRoom(client, roomCode, nickname, false));
     client.on('join-team', (team) => joinTeam(client, team));
     client.on('new-game', () => newGame(client));
     
     // ingame
     client.on('new-round', () => newRound(client));
     client.on('guess-card', (pos) => guessCard(client, pos));
-    client.on('give-clue', (clue, amount, sender) => giveClue(client, clue, amount, sender));
+    client.on('give-clue', (clue, amount) => giveClue(client, clue, amount));
 
     // leaving game
     client.on('disconnect', () => handleDisconnection(client));
@@ -358,7 +358,7 @@ function giveClue(client, clue, amount, sender) {
     }
     */
 
-    io.to(roomCode).emit('recive-clue', clue.toUpperCase(), amount, sender);
+    io.to(roomCode).emit('recive-clue', clue.toUpperCase(), amount, getPlayer(client).name, getPlayer(client).team);
 }
 
 // ----------------------------------------------------------------------------------------------------

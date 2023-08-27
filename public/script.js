@@ -1,28 +1,33 @@
 
+// ----------------------------------------------------------------------------------------------------
+// Initiate Client
+
+const client = io();
+
+/*
+NameScreen ->   HomeScreen ->   LobbyScreen ->  GameScreen ->   EndScreen
+Name inp.       Join but.       Join red but.   Flip but.       New Game but.
+Start but.      Create but.     Join blue but.  Main div.       Main div.
+                                Play but.
+*/
+
+// ----------------------------------------------------------------------------------------------------
+// Define Constants
+
 const RED = 1;
 const GREEN = 2;
 const BLUE = 3;
 const INNOCENT = 4;
 const ASSASSIN = 5;
 
-const cardTypes = {
+const DEFAULT = INNOCENT;
+
+const CARDIDS = {
 	1: {id: RED, string: 'red', card_path: 'img/cards/red.png', cover_paths: ['img/covers/red1.png', 'img/covers/red2.png']},
 	2: {id: GREEN, string: 'green', card_path: 'img/cards/green.png', cover_paths: ['img/covers/green1.png', 'img/covers/green2.png']},
 	3: {id: BLUE, string: 'blue', card_path: 'img/cards/blue.png', cover_paths: ['img/covers/blue1.png', 'img/covers/blue2.png']},
 	4: {id: INNOCENT, string: 'innocent', card_path: 'img/cards/innocent.png', cover_paths: ['img/covers/innocent1.png', 'img/covers/innocent2.png']},
 	5: {id: ASSASSIN, string: 'assassin', card_path: 'img/cards/assassin.png', cover_paths: ['img/covers/assassin.png']},
-}
-
-const defaultCardType = cardTypes[INNOCENT];
-
-const client = io();
-
-const user = {
-    name: undefined,
-    roomCode: undefined,
-    isHost: undefined,
-    team: undefined,
-    isCodeMaster: undefined
 };
 
 const TOP_LEFT = 0;
@@ -35,20 +40,41 @@ const RED_OPPERATIVE = 1;
 const BLUE_CODEMASTER = 2;
 const BLUE_OPPERATIVE = 3;
 
+const COLUMNS = ['a', 'b', 'c', 'd', 'e'];
+
+// ----------------------------------------------------------------------------------------------------
+// Create Player Data
+
+const user = {
+    name: undefined,
+    roomCode: undefined,
+    isHost: undefined,
+    team: undefined,
+    isCodeMaster: undefined
+};
+
 const players = [undefined, undefined, undefined, user.name];
 
-/*
-NameScreen ->   HomeScreen ->   LobbyScreen ->  GameScreen ->   EndScreen
-Name inp.       Join but.       Join red but.   Flip but.       New Game but.
-Start but.      Create but.     Join blue but.  Main div.       Main div.
-                                Play but.
-*/
+// ----------------------------------------------------------------------------------------------------
+// Start Program
 
 init();
-
 function init() {
     createNameScreen();
 }
+
+// ----------------------------------------------------------------------------------------------------
+// Handle Server
+
+client.on('joined-room', joinRoom);
+client.on('update-players', updateLobbyScreen);
+client.on('new-game', initGame);
+client.on('new-round', newRound);
+client.on('cover-card', coverCard);
+client.on('recive-clue', reciveClue);
+
+// ----------------------------------------------------------------------------------------------------
+// Name Screen
 
 function createNameScreen() {
     /*
@@ -82,6 +108,12 @@ function createNameScreen() {
     addChild(main_container, name_container);
 }
 
+function removeNameScreen() {
+    document.querySelector('.name-container').remove();
+}
+
+//? from name-button
+//? transition | Name Screen => Home Screen
 function submitName(inputedName) {
     // Dont allow empty names
     if (!inputedName) return;
@@ -90,16 +122,14 @@ function submitName(inputedName) {
     user.name = inputedName;
 
     // Create home screen
-    removeNameInput();
+    removeNameScreen();
     createHomeScreen();
 }
 
-function removeNameInput() {
-    document.querySelector('.name-container').remove();
-}
+// ----------------------------------------------------------------------------------------------------
+// Home Screen
 
 function createHomeScreen() {
-
     // Get main container
     const main_container = document.querySelector('main');
 
@@ -134,25 +164,35 @@ function createHomeScreen() {
 
     // add create room button to screen
     addChild(main_container, create_room_contianer);
-
 }
-
-client.on('joined-room', (roomId, isHost) => {
-    // Set room id and host value
-    user.roomCode = roomId;
-    user.isHost = isHost;
-
-    // Create Looby screen
-    removeHomeScreen();
-    createRoomScreen();
-})
 
 function removeHomeScreen() {
     document.querySelector('.join-room-container').remove();
     document.querySelector('.create-room-container').remove();
 }
 
-function createRoomScreen() {
+// ----------------------------------------------------------------------------------------------------
+// Lobby Screen
+
+//? from server
+//? transition | Home Screen => Lobby Screen
+function joinRoom(roomId, isHost) {
+    // Set room id and host value
+    user.roomCode = roomId;
+    user.isHost = isHost;
+
+    // Create Looby screen
+    removeHomeScreen();
+    createLobbyScreen();
+}
+
+//? from red-players-button
+function joinTeam(team) {
+    user.team = team;
+    client.emit('join-team', user.team);
+}
+
+function createLobbyScreen() {
 
     // Get header container
     const header_container = document.querySelector('.header');
@@ -243,14 +283,17 @@ function createRoomScreen() {
     play_button.addEventListener('click', () => client.emit('new-game'));
 }
 
-function joinTeam(team) {
-    user.team = team;
-    client.emit('join-team', user.team);
+function removeLobbyScreen() {
+    document.querySelector('.red-players-container').remove();
+    document.querySelector('.blue-players-container').remove();
+
+    if (!user.isHost) return;
+
+    document.querySelector('.play-button-container').remove();
 }
 
-// TODO do this without IDs
-client.on('update-players', (redTeam, blueTeam) => updatePlayerLists(redTeam, blueTeam));
-function updatePlayerLists(redTeam, blueTeam) {
+//? from server
+function updateLobbyScreen(redTeam, blueTeam) {
 
     // Get main container
     const main_container = document.querySelector('.main');
@@ -289,35 +332,16 @@ function updatePlayerLists(redTeam, blueTeam) {
     }
 }
 
-client.on('new-game', playerNames => initGame(playerNames));
+// ----------------------------------------------------------------------------------------------------
+// Empty Game Screen
+
+//? from server
+//? transition | Lobby Screen => Game Screen
 function initGame(playerNames) {
     removeLobbyScreen();
-    definePlayerRolls(playerNames)
+    definePlayerRoles(playerNames)
     createGameScreen();
     createCards();
-}
-
-function removeLobbyScreen() {
-    document.querySelector('.red-players-container').remove();
-    document.querySelector('.blue-players-container').remove();
-
-    if (!user.isHost) return;
-
-    document.querySelector('.play-button-container').remove();
-}
-
-function definePlayerRolls(playerNames) {
-    const i = playerNames.indexOf(user.name);
-
-    f = d => {
-        if (i % 2) d = -d;
-        return (i + d + 4) % 4;
-    }
-    
-    players[TOP_LEFT] = playerNames[f(3)];
-    players[BOTTOM_LEFT] = playerNames[f(2)];
-    players[TOP_RIGHT] = playerNames[f(1)];
-    players[BOTTOM_RIGHT] = playerNames[i];
 }
 
 function createGameScreen() {
@@ -346,16 +370,15 @@ function createGameScreen() {
     const card_container = newElem('div', 'card-container');
 
     // Fill card container
-    const arr = ['a', 'b', 'c', 'd', 'e'];
-    for (var r = 1; r <= 5; r++) {
-        for (var i = 0; i < 5; i++) {
+    COLUMNS.forEach(c => {
+        for (var r = 1; r <= 5; r++) {
             // Create card pos
-            const card_pos = newElem('div', 'card-pos-' + arr[i] + r, arr[i] + r);
+            const card_pos = newElem('div', `card-pos-${c}${r}`, `${c}${r}`);
             card_pos.addEventListener('click', () => guessCard(card_pos.id));
 
             addChild(card_container, card_pos);
         }
-    }
+    });
 
     // Add card container to main container
     addChild(main_container, card_container);
@@ -364,7 +387,7 @@ function createGameScreen() {
 
     // Create topleft nametag container
     const topleft_nametag_container = newElem('div', 'topleft-nametag-container');
-    addClass(topleft_nametag_container, cardTypes[opp_team].string);
+    addClass(topleft_nametag_container, CARDIDS[opp_team].string);
 
     // Create topleft nametag label
     const topleft_nametag_label = newElem('h3', 'topleft-nametag-label');
@@ -378,7 +401,7 @@ function createGameScreen() {
 
     // Create bottomleft nametag container
     const bottomleft_nametag_container = newElem('div', 'bottomleft-nametag-container');
-    addClass(bottomleft_nametag_container, cardTypes[opp_team].string);
+    addClass(bottomleft_nametag_container, CARDIDS[opp_team].string);
 
     // Create bottomleft nametag label
     const bottomleft_nametag_label = newElem('h3', 'bottomleft-nametag-label');
@@ -392,7 +415,7 @@ function createGameScreen() {
 
     // Create topright nametag container
     const topright_nametag_container = newElem('div', 'topright-nametag-container');
-    addClass(topright_nametag_container, cardTypes[user.team].string);
+    addClass(topright_nametag_container, CARDIDS[user.team].string);
     
     // Create topright nametag label
     const topright_nametag_label = newElem('h3', 'topright-nametag-label');
@@ -406,7 +429,7 @@ function createGameScreen() {
 
     // Create bottomright nametag container
     const bottomright_nametag_container = newElem('div', 'bottomright-nametag-container');
-    addClass(bottomright_nametag_container, cardTypes[user.team].string);
+    addClass(bottomright_nametag_container, CARDIDS[user.team].string);
     
     // Create bottomright nametag label
     const bottomright_nametag_label = newElem('h3', 'bottomright-nametag-label');
@@ -435,6 +458,17 @@ function createGameScreen() {
     // Add game log container to main container
     addChild(main_container, game_log_container);
 
+}
+
+function definePlayerRoles(playerNames) {
+    const i = playerNames.indexOf(user.name);
+
+    const shiftBy = x => (i + 4 + ((i % 2) ? -x : x)) % 4;
+    
+    players[TOP_LEFT] = playerNames[shiftBy(3)];
+    players[BOTTOM_LEFT] = playerNames[shiftBy(2)];
+    players[TOP_RIGHT] = playerNames[shiftBy(1)];
+    players[BOTTOM_RIGHT] = playerNames[i];
 }
 
 function createCards() {
@@ -510,12 +544,10 @@ function getFreePos() {
     return openContainers[0].className;
 }
 
-client.on('new-round', (cards, isCodeMaster) => {
+//? from server
+//? event | Empty Game Screen => Active Game Screen
+function newRound(cards, isCodeMaster) {
     user.isCodeMaster = isCodeMaster;
-    newRound(cards);
-});
-
-function newRound(cards) {
     removeClueInput();
     addClueinput();
     clearCovers();
@@ -524,32 +556,36 @@ function newRound(cards) {
     setTimeout(() => unflipCards(cards), 800);
 }
 
-function removeClueInput() {
-    const give_clue_container = document.querySelector('.give-clue-container');
-    if (give_clue_container == null) return;
-    give_clue_container.remove();
-}
+// ----------------------------------------------------------------------------------------------------
+// Active Game Screen
 
 function addClueinput() {
     if (!user.isCodeMaster) return;
 
-    // get main section
+    // get main container
     const main_container = document.querySelector('.main');
 
-    // create 'give clue' button and input fields
+    // create give clue container
     const give_clue_container = newElem('div', 'give-clue-container');
     const clue_input = newElem('input', 'clue-input', 'clue-input');
     clue_input.type = 'text';
     clue_input.placeholder = 'Enter your clue here';
+
     addChild(give_clue_container, clue_input);
+
+    // Create clue amount input
     const clue_amount_input = newElem('input', 'clue-amount-input', 'clue-amount-input');
     clue_amount_input.type = 'number';
     clue_amount_input.value = 1;
     clue_amount_input.min = 0;
     clue_amount_input.max = 9;
+
     addChild(give_clue_container, clue_amount_input);
+
+    // Create give clue button
     const give_clue_button = newElem('button', 'give-clue-button', 'give-clue-button');
     give_clue_button.textContent = 'Give Clue';
+
     addChild(give_clue_container, give_clue_button);
 
     // add 'give clue' button and input fields to screen
@@ -558,12 +594,10 @@ function addClueinput() {
     give_clue_button.addEventListener('click', giveClue);
 }
 
-function clearCovers() {
-    const covers = document.querySelectorAll('.card-cover');
-
-    covers.forEach((cover) => {
-        cover.remove();
-    });
+function removeClueInput() {
+    const give_clue_container = document.querySelector('.give-clue-container');
+    if (give_clue_container == null) return;
+    give_clue_container.remove();
 }
 
 function editCards(cards) {
@@ -577,11 +611,21 @@ function editCards(cards) {
     });
 }
 
+function flipCards() {
+    document.querySelectorAll('.card').forEach(card => addClass(card.firstChild, 'flipped'));
+}
+
+function unflipCards(cards) {
+    editCards(cards);
+    document.querySelectorAll('.card').forEach(card => removeClass(card.firstChild, 'flipped'));
+}
+
+//? from card-pos-<pos>
 function guessCard(pos) {
     client.emit('guess-card', pos);
 }
 
-client.on('cover-card', (pos, id) => {
+function coverCard(pos, id) {
     const card_pos = document.getElementById(pos);
     const card = card_pos.firstChild;
     const inner = card.firstChild;
@@ -590,15 +634,24 @@ client.on('cover-card', (pos, id) => {
     const card_cover = newElem('div', 'card-cover');
     addClass(card_cover, 'new');
     const card_cover_img = newElem('img', 'card-img');
-    addPath(card_cover_img, cardTypes[id].cover_paths[parseInt(pos.charAt(1)) % cardTypes[id].cover_paths.length]);
+    addPath(card_cover_img, CARDIDS[id].cover_paths[parseInt(pos.charAt(1)) % CARDIDS[id].cover_paths.length]);
     addChild(card_cover, card_cover_img);
 
     // Add card cover to screen
     addChild(inner, card_cover);
 
     setTimeout(() => removeClass(card_cover, 'new'), 10);
-});
+}
 
+function clearCovers() {
+    const covers = document.querySelectorAll('.card-cover');
+
+    covers.forEach((cover) => {
+        cover.remove();
+    });
+}
+
+//? from give-clue-button
 function giveClue() {
     const clue_element = document.getElementById('clue-input');
     const amount_element = document.getElementById('clue-amount-input');
@@ -621,22 +674,30 @@ function giveClue() {
         return;
     }
 
-    client.emit('give-clue', clue_element.value, amount_element.value, {name: user.name, team: user.team});
+    client.emit('give-clue', clue_element.value, amount_element.value);
     clue_element.value = '';
 }
 
-client.on('recive-clue', (clue, amount, sender) => {
+//? from server
+function reciveClue(clue, amount, nickname, team) {
     // get game log
     const game_log = document.getElementById('game-log');
 
     // create new list element
     const log_message = newElem('li', 'log-message');
-    addClass(log_message, cardTypes[sender.team].string);
-    log_message.textContent = `${sender.name}: '${clue}' for ${amount}`;
+    addClass(log_message, CARDIDS[team].string);
+    log_message.textContent = `${nickname}: '${clue}' for ${amount}`;
     addChild(game_log, log_message);
 
     game_log.scrollTop = game_log.scrollHeight
-});
+}
+
+// ----------------------------------------------------------------------------------------------------
+// 
+
+
+// ----------------------------------------------------------------------------------------------------
+// Editting Card Functions
 
 function getCardBack(card_element) {
     const card_inner = card_element.firstChild;
@@ -649,7 +710,7 @@ function addBackID(card_back, id) {
 
 function addBackImage(card_back) {
     const card_img = card_back.firstChild;
-    addPath(card_img, cardTypes[card_back.id].card_path);
+    addPath(card_img, CARDIDS[card_back.id].card_path);
 }
 
 function addBackText(card_back, text) {
@@ -662,14 +723,8 @@ function addBackText(card_back, text) {
     removeClass(card_text, 'assassin');
 }
 
-function flipCards() {
-    document.querySelectorAll('.card').forEach(card => addClass(card.firstChild, 'flipped'));
-}
-
-function unflipCards(cards) {
-    editCards(cards);
-    document.querySelectorAll('.card').forEach(card => removeClass(card.firstChild, 'flipped'));
-}
+// ----------------------------------------------------------------------------------------------------
+// HTML Functions
 
 function newElem(element_type, className = null, id = null) {
     return addId(addClass(document.createElement(element_type), className), id);
@@ -699,3 +754,8 @@ function addChild(element, child) {
     element.appendChild(child);
     return element;
 }
+
+// ----------------------------------------------------------------------------------------------------
+
+
+
