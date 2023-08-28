@@ -274,7 +274,9 @@ function setCards(cards, amount, id) {
 function newRound(client) {
     const roomCode = getRoomCode(client);
     // Change which team goes first
-    getRoom(roomCode).first = (getRoom(roomCode).first == RED) ? BLUE : RED;
+    getRoom(roomCode).first = (getRoom(roomCode).first != RED) ? RED : BLUE;
+
+    getRoom(roomCode).turn = (getRoom(roomCode).first == RED) ? RED_CODEMASTER : BLUE_CODEMASTER;
 
     // Change who is code master
     const playerIds = getRoom(roomCode).players;
@@ -302,9 +304,6 @@ function newRound(client) {
             covered: false
         }
     });
-
-    // Reset Turn
-    getRoom(roomCode).turn = RED_CODEMASTER;
     
     // Broadcast new layout
     getIdsOfPlayersIn(roomCode).forEach(playerId => {
