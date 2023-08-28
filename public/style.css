@@ -359,11 +359,10 @@ button {
 
 .flip-button-container {
     position: absolute;
-    left: 50%;
+    right: 12rem;
     top: -4rem;
     width: 5rem;
     height: 3rem;
-    transform: translateX(-50%);
 }
 
 #flip-button {
@@ -421,6 +420,31 @@ button {
     margin: 0;
     top: 50%;
     transform: translate(0, -50%);
+}
+
+.turn-indicator-container {
+    position: absolute;
+    left: 50%;
+    top: -4rem;
+    width: 15rem;
+    height: 3rem;
+    text-align: center;
+    transform: translateX(-50%);
+}
+
+.turn-indicator {
+    position: absolute;
+    width: max-content;
+    left: 50%;
+    top: 50%;
+    padding: 0.7rem 1rem;
+    transform: translate(-50%, -50%);
+    margin: 0;
+    background: var(--color-primary);
+    border: 2px solid var(--color-contrast);
+    border-radius: 0.5rem;
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    font-size: 1.1rem;
 }
 
 .game-log-container {

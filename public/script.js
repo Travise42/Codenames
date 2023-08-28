@@ -451,6 +451,17 @@ function createGameScreen() {
     addChild(main_container, bottomright_nametag_container);
 
 
+    // Add turn indicator container
+    const turn_indicator_container = newElem('div', 'turn-indicator-container');
+
+    // Add turn indicator
+    const turn_indicator = newElem('h3', 'turn-indicator');
+
+    addChild(turn_indicator_container, turn_indicator);
+
+    // Add turn indicator container to main container
+    addChild(main_container, turn_indicator_container);
+
     // Create game log container
     const game_log_container = newElem('div', 'game-log-container');
 
@@ -712,6 +723,7 @@ function nextTurn(newTurn) {
     turn = newTurn;
     if (turn == user.role) addPlayingElements();
     else removePlayingElements();
+    editTurnIndicator();
 }
 
 function addPlayingElements() {
@@ -728,6 +740,40 @@ function removePlayingElements() {
     removeClueInput();
 }
 
+function editTurnIndicator() {
+    // Edit turn-indicator to tell the player whos turn it is
+    const [team, isSpymaster] = getRoleAttributes(turn);
+    console.log(team + ' - ' + isSpymaster);
+    console.log(user.team + ' - ' + user.isSpymaster);
+
+    const turn_indicator = document.querySelector('.turn-indicator');
+
+    if (user.team == team) {
+        if (user.isSpymaster == isSpymaster) {
+            // Your turn
+            turn_indicator.textContent = 'Your Turn...';
+            return;
+        }
+        if (!user.isSpymaster) {
+            // Your teamate's turn (spymaster)
+            turn_indicator.textContent = 'Your Teamate is Thinking...';
+            return;
+        }
+        // Your teamate's turn (opperative)
+        turn_indicator.textContent = 'Your Teamate is Guessing...';
+        return;
+    }
+
+    if (isSpymaster) {
+        // The opponent spymaster's turn
+        turn_indicator.textContent = 'Your Opponent Spymaster is Thinking...';
+        return;
+    }
+
+    // The opponent opperative's turn
+    turn_indicator.textContent = 'Your Opponent Opperative is Guessing...';
+}
+
 // ----------------------------------------------------------------------------------------------------
 // Player Functions
 
@@ -738,6 +784,12 @@ function setSpymaster(value) {
 
 function updateRole() {
     user.role = (user.team == RED ? 0 : 2) + !user.isSpymaster;
+}
+
+function getRoleAttributes(role) {
+    const team = Math.floor(role/2) ? BLUE : RED;
+    const isSpymaster = !(role % 2);
+    return [team, isSpymaster];
 }
 
 // ----------------------------------------------------------------------------------------------------
