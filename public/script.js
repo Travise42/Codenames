@@ -35,9 +35,9 @@ const BOTTOM_LEFT = 1;
 const TOP_RIGHT = 2;
 const BOTTOM_RIGHT = 3;
 
-const RED_CODEMASTER = 0;
+const RED_SPYMASTER = 0;
 const RED_OPPERATIVE = 1;
-const BLUE_CODEMASTER = 2;
+const BLUE_SPYMASTER = 2;
 const BLUE_OPPERATIVE = 3;
 
 const COLUMNS = ['a', 'b', 'c', 'd', 'e'];
@@ -50,10 +50,13 @@ const user = {
     roomCode: undefined,
     isHost: undefined,
     team: undefined,
-    isCodeMaster: undefined
+    isSpymaster: undefined,
+    role: undefined
 };
 
-const players = [undefined, undefined, undefined, user.name];
+let players = [];
+
+let turn;
 
 // ----------------------------------------------------------------------------------------------------
 // Start Program
@@ -72,6 +75,7 @@ client.on('new-game', initGame);
 client.on('new-round', newRound);
 client.on('cover-card', coverCard);
 client.on('recive-clue', reciveClue);
+client.on('next-turn', nextTurn);
 
 // ----------------------------------------------------------------------------------------------------
 // Name Screen
@@ -337,8 +341,9 @@ function updateLobbyScreen(redTeam, blueTeam) {
 
 //? from server
 //? transition | Lobby Screen => Game Screen
-function initGame(playerNames) {
+function initGame(playerNames, isSpymaster) {
     removeLobbyScreen();
+    setSpymaster(isSpymaster);
     definePlayerRoles(playerNames)
     createGameScreen();
     createCards();
@@ -374,7 +379,10 @@ function createGameScreen() {
         for (var r = 1; r <= 5; r++) {
             // Create card pos
             const card_pos = newElem('div', `card-pos-${c}${r}`, `${c}${r}`);
-            card_pos.addEventListener('click', () => guessCard(card_pos.id));
+            card_pos.addEventListener('click', () => {
+                if (!card_pos.firstChild.classList.contains('clickable')) return;
+                guessCard(card_pos.id)
+            });
 
             addChild(card_container, card_pos);
         }
@@ -383,15 +391,14 @@ function createGameScreen() {
     // Add card container to main container
     addChild(main_container, card_container);
 
-    const opp_team = (user.team != RED) ? RED : BLUE;
-
     // Create topleft nametag container
     const topleft_nametag_container = newElem('div', 'topleft-nametag-container');
-    addClass(topleft_nametag_container, CARDIDS[opp_team].string);
+    addClass(topleft_nametag_container, 'red');
 
     // Create topleft nametag label
     const topleft_nametag_label = newElem('h3', 'topleft-nametag-label');
-    topleft_nametag_label.textContent = players[TOP_LEFT];
+    topleft_nametag_label.textContent = players[TOP_LEFT].toUpperCase();
+    if (user.role == RED_SPYMASTER) topleft_nametag_label.textContent += ' (YOU)';
 
     addChild(topleft_nametag_container, topleft_nametag_label);
 
@@ -401,11 +408,12 @@ function createGameScreen() {
 
     // Create bottomleft nametag container
     const bottomleft_nametag_container = newElem('div', 'bottomleft-nametag-container');
-    addClass(bottomleft_nametag_container, CARDIDS[opp_team].string);
+    addClass(bottomleft_nametag_container, 'red');
 
     // Create bottomleft nametag label
     const bottomleft_nametag_label = newElem('h3', 'bottomleft-nametag-label');
-    bottomleft_nametag_label.textContent = players[BOTTOM_LEFT];
+    bottomleft_nametag_label.textContent = players[BOTTOM_LEFT].toUpperCase();
+    if (user.role == RED_OPPERATIVE) bottomleft_nametag_label.textContent += ' (YOU)';
 
     addChild(bottomleft_nametag_container, bottomleft_nametag_label);
 
@@ -415,11 +423,12 @@ function createGameScreen() {
 
     // Create topright nametag container
     const topright_nametag_container = newElem('div', 'topright-nametag-container');
-    addClass(topright_nametag_container, CARDIDS[user.team].string);
+    addClass(topright_nametag_container, 'blue');
     
     // Create topright nametag label
     const topright_nametag_label = newElem('h3', 'topright-nametag-label');
-    topright_nametag_label.textContent = players[TOP_RIGHT];
+    topright_nametag_label.textContent = players[TOP_RIGHT].toUpperCase();
+    if (user.role == BLUE_SPYMASTER) topright_nametag_label.textContent += ' (YOU)';
 
     addChild(topright_nametag_container, topright_nametag_label);
 
@@ -429,11 +438,12 @@ function createGameScreen() {
 
     // Create bottomright nametag container
     const bottomright_nametag_container = newElem('div', 'bottomright-nametag-container');
-    addClass(bottomright_nametag_container, CARDIDS[user.team].string);
+    addClass(bottomright_nametag_container, 'blue');
     
     // Create bottomright nametag label
     const bottomright_nametag_label = newElem('h3', 'bottomright-nametag-label');
-    bottomright_nametag_label.textContent = players[BOTTOM_RIGHT] + ' (You)';
+    bottomright_nametag_label.textContent = players[BOTTOM_RIGHT].toUpperCase();
+    if (user.role == BLUE_OPPERATIVE) bottomright_nametag_label.textContent += ' (YOU)';
 
     addChild(bottomright_nametag_container, bottomright_nametag_label);
 
@@ -457,18 +467,19 @@ function createGameScreen() {
 
     // Add game log container to main container
     addChild(main_container, game_log_container);
-
 }
 
 function definePlayerRoles(playerNames) {
-    const i = playerNames.indexOf(user.name);
+    //const i = playerNames.indexOf(user.name);
 
-    const shiftBy = x => (i + 4 + ((i % 2) ? -x : x)) % 4;
+    // const shiftBy = x => (i + 4 + ((i % 2) ? -x : x)) % 4;
     
-    players[TOP_LEFT] = playerNames[shiftBy(3)];
-    players[BOTTOM_LEFT] = playerNames[shiftBy(2)];
-    players[TOP_RIGHT] = playerNames[shiftBy(1)];
-    players[BOTTOM_RIGHT] = playerNames[i];
+    // players[TOP_LEFT] = playerNames[shiftBy(3)];
+    // players[BOTTOM_LEFT] = playerNames[shiftBy(2)];
+    // players[TOP_RIGHT] = playerNames[shiftBy(1)];
+    // players[BOTTOM_RIGHT] = playerNames[i];
+
+    players = playerNames;
 }
 
 function createCards() {
@@ -546,22 +557,20 @@ function getFreePos() {
 
 //? from server
 //? event | Empty Game Screen => Active Game Screen
-function newRound(cards, isCodeMaster) {
-    user.isCodeMaster = isCodeMaster;
-    removeClueInput();
-    addClueinput();
+function newRound(cards, isSpymaster, turn) {
+    setSpymaster(isSpymaster);
+    clearLog();
     clearCovers();
     editCards(cards);
     flipCards();
+    nextTurn(turn);
     setTimeout(() => unflipCards(cards), 800);
 }
 
 // ----------------------------------------------------------------------------------------------------
 // Active Game Screen
 
-function addClueinput() {
-    if (!user.isCodeMaster) return;
-
+function addClueInput() {
     // get main container
     const main_container = document.querySelector('.main');
 
@@ -689,12 +698,47 @@ function reciveClue(clue, amount, nickname, team) {
     log_message.textContent = `${nickname}: '${clue}' for ${amount}`;
     addChild(game_log, log_message);
 
-    game_log.scrollTop = game_log.scrollHeight
+    game_log.scrollTop = game_log.scrollHeight;
+}
+
+function clearLog() {
+    // get game log
+    const game_log = document.getElementById('game-log');
+    while (game_log.children.length) game_log.removeChild(game_log.firstChild);
+}
+
+//? from server
+function nextTurn(newTurn) {
+    turn = newTurn;
+    if (turn == user.role) addPlayingElements();
+    else removePlayingElements();
+}
+
+function addPlayingElements() {
+    removePlayingElements();
+
+    if (!user.isSpymaster) document.querySelectorAll('.card').forEach((card_element) => addClass(card_element, 'clickable'));
+    else addClueInput();
+}
+
+function removePlayingElements() {
+    document.querySelectorAll('.card').forEach((card_element) => {
+        removeClass(card_element, 'clickable')
+    });
+    removeClueInput();
 }
 
 // ----------------------------------------------------------------------------------------------------
-// 
+// Player Functions
 
+function setSpymaster(value) {
+    user.isSpymaster = value;
+    updateRole();
+}
+
+function updateRole() {
+    user.role = (user.team == RED ? 0 : 2) + !user.isSpymaster;
+}
 
 // ----------------------------------------------------------------------------------------------------
 // Editting Card Functions

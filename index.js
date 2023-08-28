@@ -247,8 +247,9 @@ function joinTeam(client, team) {
 //TODO - OPTIMIZE
 //? from a client
 function newGame(client) {
-    const roomCode = getRoomCode(client);
-    io.to(roomCode).emit('new-game', getNamesOfPlayersIn(roomCode));
+    getIdsOfPlayersIn(getRoomCode(client)).forEach((playerId, i) => {
+        io.to(playerId).emit('new-game', getNamesOfPlayersIn(getRoomCode(client)), (RED_CODEMASTER == i || BLUE_CODEMASTER == i));
+    });
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -276,9 +277,9 @@ function newRound(client) {
     getRoom(roomCode).first = (getRoom(roomCode).first == RED) ? BLUE : RED;
 
     // Change who is code master
-    const players = getRoom(roomCode).players;
-    var temp = [players[1], players[0], players[3], players[2]];
-    players[0] = temp[0]; players[1] = temp[1]; players[2] = temp[2]; players[3] = temp[3];
+    const playerIds = getRoom(roomCode).players;
+    var temp = [playerIds[1], playerIds[0], playerIds[3], playerIds[2]];
+    playerIds[0] = temp[0]; playerIds[1] = temp[1]; playerIds[2] = temp[2]; playerIds[3] = temp[3];
     
     // Create layout ids
     const cardIds = setCards( setCards( setCards( setCards(
@@ -301,20 +302,23 @@ function newRound(client) {
             covered: false
         }
     });
+
+    // Reset Turn
+    getRoom(roomCode).turn = RED_CODEMASTER;
     
     // Broadcast new layout
     getIdsOfPlayersIn(roomCode).forEach(playerId => {
         const alteredCards = Object.values(cards).map(card => ({...card}));
-        const codeMaster = (players[RED_CODEMASTER] == playerId || players[BLUE_CODEMASTER] == playerId);
-        if (!codeMaster) alteredCards.forEach(card => card.id = 4);
-        io.to(playerId).emit('new-round', alteredCards, codeMaster);
+        const spymaster = (playerIds[RED_CODEMASTER] == playerId || playerIds[BLUE_CODEMASTER] == playerId);
+        if (!spymaster) alteredCards.forEach(card => card.id = 4);
+        const turn = getRoom(roomCode).turn;
+        io.to(playerId).emit('new-round', alteredCards, spymaster, turn);
     });
 }
 
 // ----------------------------------------------------------------------------------------------------
 // Handle Guessing Cards
 
-//TODO - OPTIMIZE
 //? from a client
 function guessCard(client, pos) {
     // Get room code
@@ -327,14 +331,18 @@ function guessCard(client, pos) {
     // Cover guessed card
     card.covered = true;
     io.to(roomCode).emit('cover-card', pos, card.id);
+
+    if (getPlayer(client).team == card.id) return;
+
+    // Next Turn
+    nextTurn(getRoom(roomCode));
 }
 
 // ----------------------------------------------------------------------------------------------------
 // Handle Giving Clues
 
-//TODO - OPTIMIZE
 //? from a client
-function giveClue(client, clue, amount, sender) {
+function giveClue(client, clue, amount) {
     // Get room code
     const roomCode = getRoomCode(client);
 
@@ -359,10 +367,22 @@ function giveClue(client, clue, amount, sender) {
     */
 
     io.to(roomCode).emit('recive-clue', clue.toUpperCase(), amount, getPlayer(client).name, getPlayer(client).team);
+
+    // Next Turn
+    nextTurn(getRoom(roomCode));
 }
 
 // ----------------------------------------------------------------------------------------------------
-// 
+// Handle Turns
+
+function nextTurn(room) {
+    room.turn = (room.turn + 1) % 4;
+
+    room.players.forEach(playerId => {
+        io.to(playerId).emit('next-turn', room.turn);
+    });
+}
+
 // ----------------------------------------------------------------------------------------------------
 // 
 // ----------------------------------------------------------------------------------------------------
