@@ -764,11 +764,11 @@ function madeGuess(newScores, guessesLeft = user.guesses) {
 
     turn_indicator.textContent = 'Your Turn... ' + (user.guesses - guessesLeft) + '/' + user.guesses;
 
-    if (user.guesses != guessesLeft && guessesLeft > 0) {
-        createPassButton();
-    } else {
-        removePassButton();
-    }
+    // Check if pass button shoud
+    if (guessesLeft <= 0) return;
+    
+    removePassButton();
+    createPassButton();
 }
 
 function createPassButton() {
@@ -792,6 +792,7 @@ function createPassButton() {
 function removePassButton() {
     // Get pass button container
     const pass_button_container = document.querySelector('.pass-button-container');
+    console.log(pass_button_container);
     if (pass_button_container != null) pass_button_container.remove();
 }
 
@@ -826,21 +827,19 @@ function nextTurn(newTurn, amount=0) {
     if (turn == user.role) addPlayingElements();
     else removePlayingElements();
     editTurnIndicator();
-    removePassButton();
 }
 
 function addPlayingElements() {
     removePlayingElements();
 
-    if (!user.isSpymaster) document.querySelectorAll('.card').forEach((card_element) => addClass(card_element, 'clickable'));
-    else addClueInput();
+    if (user.isSpymaster) addClueInput();
+    else document.querySelectorAll('.card').forEach((card_element) => addClass(card_element, 'clickable'));
 }
 
 function removePlayingElements() {
-    document.querySelectorAll('.card').forEach((card_element) => {
-        removeClass(card_element, 'clickable')
-    });
+    document.querySelectorAll('.card').forEach((card_element) => removeClass(card_element, 'clickable'));
     removeClueInput();
+    removePassButton();
 }
 
 function editTurnIndicator() {

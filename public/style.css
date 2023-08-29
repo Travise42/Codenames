@@ -486,9 +486,9 @@ button {
 
 .pass-button-container {
     position: absolute;
-    width: 8rem;
-    height: 4rem;
-    bottom: -5rem;
+    width: 5rem;
+    height: 3rem;
+    bottom: -4rem;
     left: 50%;
     transform: translateX(-50%);
     text-align: center;
