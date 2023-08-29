@@ -338,7 +338,8 @@ function newRound(client) {
         if (!spymaster) alteredCards.forEach(card => card.id = INNOCENT);
         const turn = room.turn;
         const scores = room.scores;
-        io.to(playerId).emit('new-round', alteredCards, spymaster, turn, scores);
+        const first = room.first;
+        io.to(playerId).emit('new-round', alteredCards, spymaster, turn, scores, first);
     });
 }
 

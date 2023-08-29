@@ -35,10 +35,10 @@ const BOTTOM_LEFT = 1;
 const TOP_RIGHT = 2;
 const BOTTOM_RIGHT = 3;
 
-const RED_SPYMASTER = 0;
-const RED_OPPERATIVE = 1;
-const BLUE_SPYMASTER = 2;
-const BLUE_OPPERATIVE = 3;
+let RED_SPYMASTER = 0;
+let RED_OPPERATIVE = 1;
+let BLUE_SPYMASTER = 2;
+let BLUE_OPPERATIVE = 3;
 
 const COLUMNS = ['a', 'b', 'c', 'd', 'e'];
 
@@ -524,15 +524,6 @@ function createGameScreen() {
 }
 
 function definePlayerRoles(playerNames) {
-    //const i = playerNames.indexOf(user.name);
-
-    // const shiftBy = x => (i + 4 + ((i % 2) ? -x : x)) % 4;
-    
-    // players[TOP_LEFT] = playerNames[shiftBy(3)];
-    // players[BOTTOM_LEFT] = playerNames[shiftBy(2)];
-    // players[TOP_RIGHT] = playerNames[shiftBy(1)];
-    // players[BOTTOM_RIGHT] = playerNames[i];
-
     players = playerNames;
 }
 
@@ -602,7 +593,8 @@ function gridCard(card, pos) {
 
 //? from server
 //? event | Empty Game Screen => Active Game Screen
-function newRound(cards, isSpymaster, turn, newScores) {
+function newRound(cards, isSpymaster, turn, newScores, newFirst) {
+    first = newFirst
     setSpymaster(isSpymaster);
     clearLog();
     clearCovers();
@@ -656,7 +648,7 @@ function removeClueInput() {
 }
 
 function editCards(cards) {
-    cards.forEach( card => {
+    cards.forEach(card => {
         const card_element = document.querySelector(`.card-pos-${card.pos}`).firstChild;
 
         const card_back = getCardBack(card_element);
@@ -702,12 +694,15 @@ function coverCard(pos, id) {
 }
 
 function clearCovers() {
-    const cards = document.querySelectorAll('.card');
-    const covers = document.querySelectorAll('.card-cover');
+    const cards = document.querySelectorAll('.covered');
+    console.log(cards);
+    cards.forEach(card => {
+        removeClass(card, 'covered');
+    })
 
-    covers.forEach((cover, i) => {
+    const covers = document.querySelectorAll('.card-cover');
+    covers.forEach(cover => {
         cover.remove();
-        removeClass(cards[i], 'covered');
     });
 }
 
@@ -843,6 +838,8 @@ function editTurnIndicator() {
 
     const turn_indicator = document.querySelector('.turn-indicator');
 
+    updateHighlightedNametags();
+
     if (user.team == team) {
         if (user.isSpymaster == isSpymaster) {
             if (!user.isSpymaster) {
@@ -874,16 +871,51 @@ function editTurnIndicator() {
     turn_indicator.textContent = 'The Opponent Opperative is Guessing...';
 }
 
+function updateHighlightedNametags() {
+    const nametags = {}
+    nametags[RED_SPYMASTER] = document.querySelector('.topleft-nametag-container'),
+    nametags[RED_OPPERATIVE] = document.querySelector('.bottomleft-nametag-container'),
+    nametags[BLUE_SPYMASTER] = document.querySelector('.topright-nametag-container'),
+    nametags[BLUE_OPPERATIVE] = document.querySelector('.bottomright-nametag-container')
+
+    // Remove highlight from everyone
+    Object.values(nametags).forEach(nametag => {
+        removeClass(nametag, 'active');
+    });
+
+    // Add highlight to the active player
+    addClass(nametags[turn], 'active');
+}
+
 // ----------------------------------------------------------------------------------------------------
 // Player Functions
 
 function setSpymaster(value) {
     user.isSpymaster = value;
     updateRole();
+    rotateRoles();
 }
 
 function updateRole() {
     user.role = (user.team == RED ? 0 : 2) + !user.isSpymaster;
+}
+
+function rotateRoles() {
+
+    if (TOP_LEFT == RED_SPYMASTER) {
+        RED_SPYMASTER = 1;
+        RED_OPPERATIVE = 0;
+        BLUE_SPYMASTER = 3;
+        BLUE_OPPERATIVE = 2;
+        
+        return;
+    }
+
+    RED_SPYMASTER = 0;
+    RED_OPPERATIVE = 1;
+    BLUE_SPYMASTER = 2;
+    BLUE_OPPERATIVE = 3;
+    
 }
 
 function getRoleAttributes(role) {

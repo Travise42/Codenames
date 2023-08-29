@@ -302,6 +302,7 @@ button {
     transform: translate(-50%, -50%) translateZ(-10px);
     perspective: 1000px;
     cursor: pointer;
+    transition: all 50ms ease-in-out;
     
     :not(&.covered) {
         &.clickable:hover  {
@@ -385,6 +386,8 @@ button {
     border-style: outset;
     font-family: Verdana, Geneva, Tahoma, sans-serif;
     font-size: 1.1rem;
+    color: var(--color-contrast);
+    transition: color 300ms ease-in-out;
     
     &.red {
         border-color: var(--color-red);
@@ -394,6 +397,9 @@ button {
     }
     &.blue {
         border-color: var(--color-blue);
+    }
+    &.active {
+        color: #f7ff6b;
     }
 }
 
@@ -423,6 +429,7 @@ button {
     margin: 0;
     top: 50%;
     transform: translate(0, -50%);
+    color: inherit;
 }
 
 .turn-indicator-container {
