@@ -224,7 +224,7 @@ function createRoom(client, nickname) {
 //TODO - OPTIMIZE
 //? from a client
 function joinRoom(client, roomCode, nickname, isHost = false) {
-    if (getRoom(roomCode) == null) return;
+    if (rooms[roomCode] == null) return;
     if (!isHost && Array.from(io.sockets.adapter.rooms.get(roomCode)).length >= 4) return;
 
     // Add player to room

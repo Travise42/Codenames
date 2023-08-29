@@ -792,7 +792,6 @@ function createPassButton() {
 function removePassButton() {
     // Get pass button container
     const pass_button_container = document.querySelector('.pass-button-container');
-    console.log(pass_button_container);
     if (pass_button_container != null) pass_button_container.remove();
 }
 
