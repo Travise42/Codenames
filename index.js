@@ -117,6 +117,7 @@ io.on('connection', (client) => {
     
     // ingame
     client.on('new-round', () => newRound(client));
+    client.on('pass-guess', () => passGuess(client));
     client.on('guess-card', (pos) => guessCard(client, pos));
     client.on('give-clue', (clue, amount) => giveClue(client, clue, amount));
 
@@ -349,12 +350,21 @@ function guessCard(client, pos) {
     if (getRoom(roomCode).scores[card.id] != null) getRoom(roomCode).scores[card.id] -= 1;
     getRoom(roomCode).guesses -= 1;
     io.to(roomCode).emit('cover-card', pos, card.id);
-    client.emit('made-guess', getRoom(roomCode).guesses);
+    client.emit('made-guess', getRoom(roomCode).scores, getRoom(roomCode).guesses);
 
     if (getPlayer(client).team == card.id && getRoom(roomCode).guesses > 0) return;
 
     // Next Turn
-    nextTurn(getRoom(roomCode));
+    nextTurn(client);
+}
+
+function passGuess(client) {
+    const roomCode = getRoomCode(client);
+
+    // Handle cheaters
+    if (client.id != getRoom(roomCode).players[getRoom(roomCode).turn]) return;
+
+    nextTurn(client);
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -364,6 +374,9 @@ function guessCard(client, pos) {
 function giveClue(client, clue, amount) {
     // Get room code
     const roomCode = getRoomCode(client);
+
+    // Handle cheaters
+    if (client.id != getRoom(roomCode).players[getRoom(roomCode).turn]) return;
 
     /* //TODO deal with hackers using this code
     if (!clue_element.value) return;
@@ -389,17 +402,18 @@ function giveClue(client, clue, amount) {
     io.to(roomCode).emit('recive-clue', clue.toUpperCase(), amount, getPlayer(client).name, getPlayer(client).team);
 
     // Next Turn
-    nextTurn(getRoom(roomCode), amount);
+    nextTurn(client, amount);
 }
 
 // ----------------------------------------------------------------------------------------------------
 // Handle Turns
 
-function nextTurn(room, amount=0) {
+function nextTurn(client, amount=0) {
+    const room = getRoom(getRoomCode(client))
     room.turn = (room.turn + 1) % 4;
 
     room.players.forEach(playerId => {
-        io.to(playerId).emit('next-turn', room.turn, room.scores, amount);
+        io.to(playerId).emit('next-turn', room.turn, amount);
     });
 }
 

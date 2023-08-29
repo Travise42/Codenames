@@ -484,6 +484,24 @@ button {
     color: white;
 }
 
+.pass-button-container {
+    position: absolute;
+    width: 8rem;
+    height: 4rem;
+    bottom: -5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    font-size: 2rem;
+}
+
+#pass-button {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
 .game-log-container {
     position: absolute;
     right: 0.3rem;

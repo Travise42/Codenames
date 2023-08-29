@@ -78,7 +78,7 @@ client.on('joined-room', joinRoom);
 client.on('update-players', updateLobbyScreen);
 client.on('new-game', initGame);
 client.on('new-round', newRound);
-client.on('made-guess', updateGuesses)
+client.on('made-guess', madeGuess)
 client.on('cover-card', coverCard);
 client.on('recive-clue', reciveClue);
 client.on('next-turn', nextTurn);
@@ -611,13 +611,14 @@ function getFreePos() {
 
 //? from server
 //? event | Empty Game Screen => Active Game Screen
-function newRound(cards, isSpymaster, turn, scores) {
+function newRound(cards, isSpymaster, turn, newScores) {
     setSpymaster(isSpymaster);
     clearLog();
     clearCovers();
     editCards(cards);
     flipCards();
-    nextTurn(turn, scores, undefined);
+    nextTurn(turn, undefined);
+    updateScoring(newScores);
     setTimeout(() => unflipCards(cards), 800);
 }
 
@@ -688,6 +689,7 @@ function guessCard(pos) {
     client.emit('guess-card', pos);
 }
 
+//? from server
 function coverCard(pos, id) {
     const card_pos = document.getElementById(pos);
     const card = card_pos.firstChild;
@@ -753,14 +755,48 @@ function giveClue() {
     clue_element.value = '';
 }
 
-function updateGuesses(guessesLeft = user.guesses) {
-    // Get latest log message
-    const log_messages = document.querySelectorAll('.log-message');
+//? from server
+function madeGuess(newScores, guessesLeft = user.guesses) {
+    updateScoring(newScores);
 
     // Get turn indicator
     const turn_indicator = document.querySelector('.turn-indicator');
 
     turn_indicator.textContent = 'Your Turn... ' + (user.guesses - guessesLeft) + '/' + user.guesses;
+
+    if (user.guesses != guessesLeft && guessesLeft > 0) {
+        createPassButton();
+    } else {
+        removePassButton();
+    }
+}
+
+function createPassButton() {
+    // Get main container
+    const main_container = document.querySelector('.main');
+
+    // Create pass button container
+    const pass_button_container = newElem('div', 'pass-button-container');
+
+    // Create pass button
+    const pass_button = newElem('button', null, 'pass-button');
+    pass_button.textContent = 'PASS';
+    pass_button.addEventListener('click', passGuess);
+
+    addChild(pass_button_container, pass_button);
+    
+    // Add pass button container to main container
+    addChild(main_container, pass_button_container);
+}
+
+function removePassButton() {
+    // Get pass button container
+    const pass_button_container = document.querySelector('.pass-button-container');
+    if (pass_button_container != null) pass_button_container.remove();
+}
+
+function passGuess() {
+    client.emit('pass-guess');
 }
 
 //? from server
@@ -784,13 +820,13 @@ function clearLog() {
 }
 
 //? from server
-function nextTurn(newTurn, newScores, amount=0) {
-    updateScoring(newScores);
+function nextTurn(newTurn, amount=0) {
     turn = newTurn;
     if (turn == user.role) user.guesses = amount;
     if (turn == user.role) addPlayingElements();
     else removePlayingElements();
     editTurnIndicator();
+    removePassButton();
 }
 
 function addPlayingElements() {
@@ -817,7 +853,7 @@ function editTurnIndicator() {
         if (user.isSpymaster == isSpymaster) {
             if (!user.isSpymaster) {
                 // Your turn (opperative)
-                updateGuesses();
+                turn_indicator.textContent = 'Your Turn... 0/' + user.guesses;
                 return;
             }
             // Your turn (spymaster)
