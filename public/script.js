@@ -14,20 +14,20 @@ Start but.      Create but.     Join blue but.  Main div.       Main div.
 // ----------------------------------------------------------------------------------------------------
 // Define Constants
 
+////const GREEN = 2;
 const RED = 1;
-const GREEN = 2;
-const BLUE = 3;
-const INNOCENT = 4;
-const ASSASSIN = 5;
+const BLUE = 2;
+const INNOCENT = 3;
+const ASSASSIN = 4;
 
 const DEFAULT = INNOCENT;
 
+////2: {id: GREEN, string: 'green', card_path: 'img/cards/green.png', cover_paths: ['img/covers/green1.png', 'img/covers/green2.png']},
 const CARDIDS = {
 	1: {id: RED, string: 'red', card_path: 'img/cards/red.png', cover_paths: ['img/covers/red1.png', 'img/covers/red2.png']},
-	2: {id: GREEN, string: 'green', card_path: 'img/cards/green.png', cover_paths: ['img/covers/green1.png', 'img/covers/green2.png']},
-	3: {id: BLUE, string: 'blue', card_path: 'img/cards/blue.png', cover_paths: ['img/covers/blue1.png', 'img/covers/blue2.png']},
-	4: {id: INNOCENT, string: 'innocent', card_path: 'img/cards/innocent.png', cover_paths: ['img/covers/innocent1.png', 'img/covers/innocent2.png']},
-	5: {id: ASSASSIN, string: 'assassin', card_path: 'img/cards/assassin.png', cover_paths: ['img/covers/assassin.png']},
+	2: {id: BLUE, string: 'blue', card_path: 'img/cards/blue.png', cover_paths: ['img/covers/blue1.png', 'img/covers/blue2.png']},
+	3: {id: INNOCENT, string: 'innocent', card_path: 'img/cards/innocent.png', cover_paths: ['img/covers/innocent1.png', 'img/covers/innocent2.png']},
+	4: {id: ASSASSIN, string: 'assassin', card_path: 'img/cards/assassin.png', cover_paths: ['img/covers/assassin.png']},
 };
 
 const TOP_LEFT = 0;
@@ -51,12 +51,17 @@ const user = {
     isHost: undefined,
     team: undefined,
     isSpymaster: undefined,
-    role: undefined
+    role: undefined,
+    guesses: undefined
 };
 
 let players = [];
 
 let turn;
+let scores = {
+    1: 0,
+    2: 0
+}
 
 // ----------------------------------------------------------------------------------------------------
 // Start Program
@@ -73,6 +78,7 @@ client.on('joined-room', joinRoom);
 client.on('update-players', updateLobbyScreen);
 client.on('new-game', initGame);
 client.on('new-round', newRound);
+client.on('made-guess', updateGuesses)
 client.on('cover-card', coverCard);
 client.on('recive-clue', reciveClue);
 client.on('next-turn', nextTurn);
@@ -462,6 +468,43 @@ function createGameScreen() {
     // Add turn indicator container to main container
     addChild(main_container, turn_indicator_container);
 
+
+    // Create red score container
+    const red_score_container = newElem('div', 'red-score-container');
+
+    // Create red score image
+    const red_score_image = newElem('img', 'red-score-image');
+    addPath(red_score_image, CARDIDS[RED].cover_paths[0]);
+
+    addChild(red_score_container, red_score_image);
+
+    // Create red score heading
+    const red_score_heading = newElem('h3', 'red-score-heading');
+
+    addChild(red_score_container, red_score_heading);
+
+    // Add red score container to main container
+    addChild(main_container, red_score_container);
+
+
+    // Create blue score container
+    const blue_score_container = newElem('div', 'blue-score-container');
+
+    // Create blue score image
+    const blue_score_image = newElem('img', 'blue-score-image');
+    addPath(blue_score_image, CARDIDS[BLUE].cover_paths[0]);
+
+    addChild(blue_score_container, blue_score_image);
+
+    // Create blue score heading
+    const blue_score_heading = newElem('h3', 'blue-score-heading');
+
+    addChild(blue_score_container, blue_score_heading);
+
+    // Add blue score container to main container
+    addChild(main_container, blue_score_container);
+
+
     // Create game log container
     const game_log_container = newElem('div', 'game-log-container');
 
@@ -568,13 +611,13 @@ function getFreePos() {
 
 //? from server
 //? event | Empty Game Screen => Active Game Screen
-function newRound(cards, isSpymaster, turn) {
+function newRound(cards, isSpymaster, turn, scores) {
     setSpymaster(isSpymaster);
     clearLog();
     clearCovers();
     editCards(cards);
     flipCards();
-    nextTurn(turn);
+    nextTurn(turn, scores, undefined);
     setTimeout(() => unflipCards(cards), 800);
 }
 
@@ -671,6 +714,18 @@ function clearCovers() {
     });
 }
 
+function updateScoring(newScores) {
+    scores = newScores;
+
+    const red_score_heading = document.querySelector('.red-score-heading');
+    red_score_heading.textContent = scores[RED];
+
+    const blue_score_heading = document.querySelector('.blue-score-heading');
+    blue_score_heading.textContent = scores[BLUE];
+
+    //TODO HANDLE WINNING
+}
+
 //? from give-clue-button
 function giveClue() {
     const clue_element = document.getElementById('clue-input');
@@ -698,12 +753,22 @@ function giveClue() {
     clue_element.value = '';
 }
 
+function updateGuesses(guessesLeft = user.guesses) {
+    // Get latest log message
+    const log_messages = document.querySelectorAll('.log-message');
+
+    // Get turn indicator
+    const turn_indicator = document.querySelector('.turn-indicator');
+
+    turn_indicator.textContent = 'Your Turn... ' + (user.guesses - guessesLeft) + '/' + user.guesses;
+}
+
 //? from server
 function reciveClue(clue, amount, nickname, team) {
-    // get game log
+    // Get game log
     const game_log = document.getElementById('game-log');
 
-    // create new list element
+    // Create new list element
     const log_message = newElem('li', 'log-message');
     addClass(log_message, CARDIDS[team].string);
     log_message.textContent = `${nickname}: '${clue}' for ${amount}`;
@@ -713,14 +778,16 @@ function reciveClue(clue, amount, nickname, team) {
 }
 
 function clearLog() {
-    // get game log
+    // Get game log
     const game_log = document.getElementById('game-log');
     while (game_log.children.length) game_log.removeChild(game_log.firstChild);
 }
 
 //? from server
-function nextTurn(newTurn) {
+function nextTurn(newTurn, newScores, amount=0) {
+    updateScoring(newScores);
     turn = newTurn;
+    if (turn == user.role) user.guesses = amount;
     if (turn == user.role) addPlayingElements();
     else removePlayingElements();
     editTurnIndicator();
@@ -743,14 +810,17 @@ function removePlayingElements() {
 function editTurnIndicator() {
     // Edit turn-indicator to tell the player whos turn it is
     const [team, isSpymaster] = getRoleAttributes(turn);
-    console.log(team + ' - ' + isSpymaster);
-    console.log(user.team + ' - ' + user.isSpymaster);
 
     const turn_indicator = document.querySelector('.turn-indicator');
 
     if (user.team == team) {
         if (user.isSpymaster == isSpymaster) {
-            // Your turn
+            if (!user.isSpymaster) {
+                // Your turn (opperative)
+                updateGuesses();
+                return;
+            }
+            // Your turn (spymaster)
             turn_indicator.textContent = 'Your Turn...';
             return;
         }
@@ -766,12 +836,12 @@ function editTurnIndicator() {
 
     if (isSpymaster) {
         // The opponent spymaster's turn
-        turn_indicator.textContent = 'Your Opponent Spymaster is Thinking...';
+        turn_indicator.textContent = 'The Opponent Spymaster is Thinking...';
         return;
     }
 
     // The opponent opperative's turn
-    turn_indicator.textContent = 'Your Opponent Opperative is Guessing...';
+    turn_indicator.textContent = 'The Opponent Opperative is Guessing...';
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -812,7 +882,7 @@ function addBackImage(card_back) {
 function addBackText(card_back, text) {
     const card_text = card_back.lastChild;
     card_text.textContent = text;
-    if (card_back.id == 5) {
+    if (card_back.id == ASSASSIN) {
         addClass(card_text, 'assassin');
         return;
     }

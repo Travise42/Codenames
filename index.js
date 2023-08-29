@@ -25,11 +25,11 @@ http.listen(port, () => console.log(`Socket.IO server running at http://localhos
 // ----------------------------------------------------------------------------------------------------
 // Define Constants
 
+////const GREEN = 2;
 const RED = 1;
-const GREEN = 2;
-const BLUE = 3;
-const INNOCENT = 4;
-const ASSASSIN = 5;
+const BLUE = 2;
+const INNOCENT = 3;
+const ASSASSIN = 4;
 
 const DEFAULT = INNOCENT;
 
@@ -71,7 +71,16 @@ rooms: {
             .
         },
         turn: <turn-id>,
-        first: <team-going-first>
+        first: <team-going-first>,
+        scores: {
+            1: <red-score>,
+            2: <blue-score>
+        },
+        guesses: <#-of-guesses-left>,
+        missed: {
+            1: <red-missed-a-card?>,
+            2: <blue-missed-a-card?>
+        }
     }
     .
     .
@@ -158,7 +167,7 @@ function cachePlayer(client, roomCode, nickname) {
 }
 
 function newRoom(roomCode) {
-    rooms[roomCode] = {code: roomCode, players: [], cards: {}, first: randInt(2)};
+    rooms[roomCode] = {code: roomCode, players: [], cards: {}, first: randInt(2), scores: {}, guesses: 0, missed: {}};
 
     /*
     cards: {
@@ -185,7 +194,7 @@ function newRoom(roomCode) {
             let pos = column + row;
             rooms[roomCode].cards[pos] = {
                 pos: pos,
-                id: 4,
+                id: INNOCENT,
                 text: '',
                 covered: false
             }
@@ -304,14 +313,19 @@ function newRound(client) {
             covered: false
         }
     });
+
+    // Create new scores
+    getRoom(roomCode).scores = {1: 8, 2: 8};
+    getRoom(roomCode).scores[getRoom(roomCode).first] += 1;
     
     // Broadcast new layout
     getIdsOfPlayersIn(roomCode).forEach(playerId => {
         const alteredCards = Object.values(cards).map(card => ({...card}));
         const spymaster = (playerIds[RED_CODEMASTER] == playerId || playerIds[BLUE_CODEMASTER] == playerId);
-        if (!spymaster) alteredCards.forEach(card => card.id = 4);
+        if (!spymaster) alteredCards.forEach(card => card.id = INNOCENT);
         const turn = getRoom(roomCode).turn;
-        io.to(playerId).emit('new-round', alteredCards, spymaster, turn);
+        const scores = getRoom(roomCode).scores;
+        io.to(playerId).emit('new-round', alteredCards, spymaster, turn, scores);
     });
 }
 
@@ -323,15 +337,21 @@ function guessCard(client, pos) {
     // Get room code
     const roomCode = getRoomCode(client);
 
+    // Handle cheaters
+    if (client.id != getRoom(roomCode).players[getRoom(roomCode).turn]) return;
+
     // Get guessed card
     const card = getRoom(roomCode).cards[pos];
     if (card == null || card.covered) return;
 
     // Cover guessed card
     card.covered = true;
+    if (getRoom(roomCode).scores[card.id] != null) getRoom(roomCode).scores[card.id] -= 1;
+    getRoom(roomCode).guesses -= 1;
     io.to(roomCode).emit('cover-card', pos, card.id);
+    client.emit('made-guess', getRoom(roomCode).guesses);
 
-    if (getPlayer(client).team == card.id) return;
+    if (getPlayer(client).team == card.id && getRoom(roomCode).guesses > 0) return;
 
     // Next Turn
     nextTurn(getRoom(roomCode));
@@ -365,20 +385,21 @@ function giveClue(client, clue, amount) {
     }
     */
 
+    getRoom(roomCode).guesses = amount;
     io.to(roomCode).emit('recive-clue', clue.toUpperCase(), amount, getPlayer(client).name, getPlayer(client).team);
 
     // Next Turn
-    nextTurn(getRoom(roomCode));
+    nextTurn(getRoom(roomCode), amount);
 }
 
 // ----------------------------------------------------------------------------------------------------
 // Handle Turns
 
-function nextTurn(room) {
+function nextTurn(room, amount=0) {
     room.turn = (room.turn + 1) % 4;
 
     room.players.forEach(playerId => {
-        io.to(playerId).emit('next-turn', room.turn);
+        io.to(playerId).emit('next-turn', room.turn, room.scores, amount);
     });
 }
 
@@ -411,7 +432,7 @@ function getRoom(roomCode) {
     if (room != null) return room;
 
     console.log(`ERROR || Room not found:\nRoom code of ${roomCode} does not exist`);
-    return {code: roomCode, players: [], cards: {}, first: 0};
+    return {code: roomCode, players: [], cards: {}, first: 0, scores: {}, guesses: 0, missed: {}};
 }
 
 function getIdsOfPlayersIn(roomCode) {

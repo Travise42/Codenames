@@ -49,7 +49,7 @@ input {
 
     &::placeholder {
         color: var(--color-contrast);
-        font-style: italic
+        font-style: italic;
     }
 
     &[type="number"]::-webkit-inner-spin-button {
@@ -445,6 +445,43 @@ button {
     border-radius: 0.5rem;
     font-family: Verdana, Geneva, Tahoma, sans-serif;
     font-size: 1.1rem;
+}
+
+.red-score-container, .blue-score-container {
+    position: absolute;
+    width: var(--card-width);
+    height: var(--card-height);
+    bottom: calc(100% + 1rem);
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    font-size: 2rem;
+}
+
+.red-score-container {
+    left: 25%;
+    transform: translateX(-50%);
+}
+
+.blue-score-container {
+    right: 25%;
+    transform: translateX(50%);
+}
+
+.red-score-image, .blue-score-image {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    left: 0;
+    top: 0;
+}
+
+.red-score-heading, .blue-score-heading {
+    position: absolute;
+    width: 40%;
+    height: 50%;
+    right: 0;
+    top: 0;
+    margin: 0;
+    color: white;
 }
 
 .game-log-container {
