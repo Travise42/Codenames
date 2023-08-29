@@ -381,10 +381,10 @@ function createGameScreen() {
     const card_container = newElem('div', 'card-container');
 
     // Fill card container
-    COLUMNS.forEach(c => {
-        for (var r = 1; r <= 5; r++) {
+    COLUMNS.forEach(column => {
+        for (var row = 1; row <= 5; row++) {
             // Create card pos
-            const card_pos = newElem('div', `card-pos-${c}${r}`, `${c}${r}`);
+            const card_pos = newElem('div', `card-pos-${column}${row}`, `${column}${row}`);
             card_pos.addEventListener('click', () => {
                 if (!card_pos.firstChild.classList.contains('clickable')) return;
                 guessCard(card_pos.id)
@@ -537,12 +537,14 @@ function definePlayerRoles(playerNames) {
 }
 
 function createCards() {
-    for (let i = 0; i < 25; i++) {
-        createCard();
-    }
+    COLUMNS.forEach(column => {
+        for (var row = 1; row <= 5; row++) {
+            createCard(`${column}${row}`);
+        }
+    });
 }
 
-function createCard() {
+function createCard(pos) {
     /*
     <div class="card">
         <div class="card-inner">
@@ -588,25 +590,14 @@ function createCard() {
     addChild(card_element, card_inner);
 
     // Add the card to the screen
-    gridCard(card_element);
+    gridCard(card_element, pos);
 }
 
-function gridCard(card) {
-    const card_pos_class = getFreePos();
+function gridCard(card, pos) {
+    const card_pos_class = `card-pos-${pos}`;
     const card_pos = document.querySelector('.' + card_pos_class);
 
     addChild(card_pos, card);
-}
-
-function getFreePos() {
-    const containers = [...document.querySelector('.card-container').children];
-    const openContainers = [];
-    containers.forEach(container => {
-        if (!container.children.length) {
-            openContainers.push(container)
-        }
-    });
-    return openContainers[0].className;
 }
 
 //? from server
@@ -668,7 +659,7 @@ function editCards(cards) {
     cards.forEach( card => {
         const card_element = document.querySelector(`.card-pos-${card.pos}`).firstChild;
 
-        let card_back = getCardBack(card_element);
+        const card_back = getCardBack(card_element);
         addBackID(card_back, card.id);
         addBackImage(card_back);
         addBackText(card_back, card.text);
@@ -705,14 +696,18 @@ function coverCard(pos, id) {
     // Add card cover to screen
     addChild(inner, card_cover);
 
+    addClass(card, 'covered');
+
     setTimeout(() => removeClass(card_cover, 'new'), 10);
 }
 
 function clearCovers() {
+    const cards = document.querySelectorAll('.card');
     const covers = document.querySelectorAll('.card-cover');
 
-    covers.forEach((cover) => {
+    covers.forEach((cover, i) => {
         cover.remove();
+        removeClass(cards[i], 'covered');
     });
 }
 
@@ -735,6 +730,7 @@ function giveClue() {
 
     if (!clue_element.value) return;
 
+    // Check if clue is already a word on the board
     const card_poses = Array.from(document.querySelector('.card-container').children);
     const duplicates = [];
     card_poses.forEach((card_pos) => {
@@ -901,7 +897,7 @@ function getRoleAttributes(role) {
 
 function getCardBack(card_element) {
     const card_inner = card_element.firstChild;
-    return card_inner.children[1 - card_inner.classList.contains('flipped')]
+    return card_inner.children[1 - card_inner.classList.contains('flipped')];
 }
 
 function addBackID(card_back, id) {

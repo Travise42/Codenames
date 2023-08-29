@@ -78,8 +78,8 @@ rooms: {
         },
         guessesLeft: <#-of-guesses-left>,
         missed: {
-            1: <red-missed-a-card?>,
-            2: <blue-missed-a-card?>
+            1: <#-of-cards-red-missed>,
+            2: <#-of-cards-blue-missed>
         }
     }
     .
@@ -174,7 +174,7 @@ function cachePlayer(client, roomCode, nickname) {
 
 function newRoom(roomCode) {
     
-    rooms[roomCode] = {code: roomCode, players: [], cards: {}, first: randInt(2), scores: {}, guessesLeft: 0, missed: {}};
+    rooms[roomCode] = {code: roomCode, players: [], cards: {}, first: randInt(2), scores: {}, guessesLeft: 0, missed: {1: 0, 2: 0}};
 
     /*
     cards: {
@@ -366,10 +366,15 @@ function guessCard(client, pos) {
     client.emit('made-guess', room.scores, room.guessesLeft);
 
     // Right guess: Go again
-    if (getPlayer(client).team == card.id && room.guessesLeft > 0) return;
+    const isCorrect = getPlayer(client).team == card.id;
+    const hasBonusGuess = room.guessesLeft == 0 && room.missed[getPlayer(client).team];
+    if (isCorrect && hasBonusGuess) room.missed[getPlayer(client).team] -= 1;
+
+
+    if (isCorrect && (room.guessesLeft > 0 || hasBonusGuess)) return;
 
     // Wrong guess: Next turn
-    if (room.guessesLeft > 0) room.missed[getPlayer(client).team] = true;
+    handleMissingCards(client);
     nextTurn(client);
 }
 
@@ -379,7 +384,14 @@ function passGuess(client) {
     // Handle cheaters
     if (client.id != getActivePlayerId(roomCode)) return;
 
+    handleMissingCards(client);
     nextTurn(client);
+}
+
+function handleMissingCards(client) {
+    const room = getRoom(getRoomCode(client));
+
+    if (room.guessesLeft > 0) room.missed[getPlayer(client).team] += room.guessesLeft;
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -462,7 +474,7 @@ function getRoom(roomCode) {
     if (room != null) return room;
 
     console.log(`ERROR || Room not found:\nRoom code of ${roomCode} does not exist`);
-    return {code: roomCode, players: [], cards: {}, first: 0, scores: {}, guessesLeft: 0, missed: {}};
+    return {code: roomCode, players: [], cards: {}, first: 0, scores: {}, guessesLeft: 0, missed: {1: 0, 2: 0}};
 }
 
 function getNamesOfPlayersIn(roomCode, team = null) {
