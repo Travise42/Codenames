@@ -406,26 +406,7 @@ function giveClue(client, clue, amount) {
 
     // Handle cheaters
     if (client.id != getActivePlayerId(roomCode)) return;
-
-    /* //TODO deal with hackers using this code
-    if (!clue_element.value) return;
-
-    const card_poses = Array.from(document.querySelector('.card-container').children);
-    const duplicates = [];
-    card_poses.forEach((card_pos) => {
-        const card = card_pos.firstChild;
-        const inner = card.firstChild;
-        if (inner.lastChild.className == 'card-cover') return;
-        removeClass(card_pos, 'invalid');
-        if (clue_element.value.toLowerCase() == inner.firstChild.lastChild.textContent.toLowerCase()) duplicates.push(card_pos);
-    });
-    if (duplicates.length) {
-        duplicates.forEach((card_pos) => {
-            addClass(card_pos, 'invalid');
-        });
-        return;
-    }
-    */
+    if (!clue) return;
 
     room.guessesLeft = amount;
     io.to(roomCode).emit('recive-clue', clue.toUpperCase(), amount, getPlayer(client).name, getPlayer(client).team);
