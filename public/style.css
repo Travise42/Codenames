@@ -236,7 +236,7 @@ button {
     display: grid;
     margin: 1rem;
     padding: 0.5rem;
-    gap: var(--card-gap-size);
+    gap: calc(10% / 15);
     grid-template-columns: repeat(5, 1fr);
     grid-template-rows: repeat(5, 1fr);
     grid-template-areas:
