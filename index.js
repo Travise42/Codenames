@@ -52,7 +52,7 @@ const words = require('./words.json').map(a => a.toUpperCase());
 /*
 rooms: {
     <room-code>: {
-        code: <room-code>,
+        roomCode: <room-code>,
         players: [
             <red-codemaster-id>,
             <red-opperative-id>,
@@ -93,7 +93,7 @@ const rooms = {};
 players: {
     <player-id>: {
         id: <player-id>,
-        room: <room-code>,
+        roomCode: <room-code>,
         name: <player-name>
     }
     .
@@ -107,51 +107,28 @@ const players = {};
 // Handle Sockets
 
 //TODO - OPTIMIZE
-io.on('connection', (client) => {
+io.on('connection', client => {
 
-    // Menu
-    client.on('create-room', (nickname) => createRoom(client, nickname));
-    client.on('join-room', (roomCode, nickname) => joinRoom(client, roomCode, nickname, false));
-    client.on('join-team', (team) => joinTeam(client, team));
+    // Home screen
+    client.on('create-room', (...args) => createRoom(client, ...args));
+    client.on('join-room', (...args) => joinRoom(client, ...args));
+    client.on('join-team', (...args) => joinTeam(client, ...args));
     client.on('new-game', () => newGame(client));
     
-    // ingame
-    client.on('new-round', () => newRound(client));
+    // game screen
     client.on('pass-guess', () => passGuess(client));
-    client.on('guess-card', (pos) => guessCard(client, pos));
-    client.on('give-clue', (clue, amount) => giveClue(client, clue, amount));
+    client.on('guess-card', (...args) => guessCard(client, ...args));
+    client.on('give-clue', (...args) => giveClue(client, ...args));
+
+    // game over screen
+    client.on('ping-change-teams', () => pingChangeTeams(client));
+    client.on('change-teams', () => changeTeams(client));
+    client.on('next-game', () => nextGame(client));
+    client.on('leave-game', () => leaveGame(client));
 
     // leaving game
-    client.on('disconnect', () => handleDisconnection(client));
+    client.on('disconnect', () => leaveGame(client));
 });
-
-// ----------------------------------------------------------------------------------------------------
-// Handle Disconnection
-
-//? from a client
-function handleDisconnection(client) {
-    // Get room code of disconnect player
-    const roomCode = players[client.id];
-
-    if (roomCode == null) return;
-
-    // Room code of disconnect player
-    const room = getRoom(roomCode);
-    // Delete any players with the id of the disconnect player
-    //! --------------------------------------------------
-    console.log(room.players[client.id]);
-    //! --------------------------------------------------
-    delete room.players[client.id];
-
-    // Notify all members that someone left
-    if (room.players.length) {
-        io.to(roomCode).emit('update-players', getNamesOfPlayersIn(roomCode, RED), getNamesOfPlayersIn(roomCode, BLUE));
-        return;
-    }
-
-    // Delete empty rooms
-    delete room;
-}
 
 // ----------------------------------------------------------------------------------------------------
 // Handle Creating & Joining Rooms
@@ -161,20 +138,33 @@ function cachePlayer(client, roomCode, nickname) {
     /*
     <player-id>: {
         id: <player-id>,
-        room: <room-code>,
+        roomCode: <room-code>,
         name: <player-name>
     }
     */
     players[client.id] = {
         id: client.id,
-        room: roomCode,
+        roomCode: roomCode,
         name: nickname
     };
 }
 
+function uncachePlayer(client) {
+    delete players[client.id];
+}
+
 function newRoom(roomCode) {
     
-    rooms[roomCode] = {code: roomCode, players: [], cards: {}, first: randInt(2), scores: {}, guessesLeft: 0, missed: {1: 0, 2: 0}};
+    rooms[roomCode] = {
+        roomCode: roomCode,
+        players: [],
+        host: null,
+        cards: {},
+        first: randInt(2),
+        scores: {},
+        guessesLeft: 0,
+        missed: {1: 0, 2: 0}
+    };
 
     /*
     cards: {
@@ -230,10 +220,36 @@ function joinRoom(client, roomCode, nickname, isHost = false) {
     // Add player to room
     client.join(roomCode);
     cachePlayer(client, roomCode, nickname);
+    if (isHost) getRoom(roomCode).host = client.id;
 
     // Announce to new player that they have joined
     client.emit('joined-room', roomCode, isHost);
     client.emit('update-players', getNamesOfPlayersIn(roomCode, RED), getNamesOfPlayersIn(roomCode, BLUE));
+}
+
+//? uncachePlayer must NOT be called before leaveRoom
+function leaveRoom(client) {
+    if (players[client.id] == null) return;
+
+    const roomCode = players[client.id].roomCode;
+
+    // Dont need to announce leaving a room if player isn't in a room
+    if (roomCode == null) return;
+
+    const room = rooms[roomCode];
+    const playerIds = room.players;
+
+    client.leave(roomCode);
+    rooms[roomCode].players.splice(rooms[roomCode].players.indexOf(client.id), 1);
+
+    // If anyone is left in the room...
+    if (playerIds.length) {
+        // Tell players this player left the room
+        io.to(roomCode).emit('update-players', getNamesOfPlayersIn(roomCode, RED), getNamesOfPlayersIn(roomCode, BLUE));
+        return;
+    }
+
+    delete room;
 }
 
 //TODO - OPTIMIZE
@@ -268,9 +284,17 @@ function newGame(client) {
     const roomCode = getRoomCode(client);
     const room = getRoom(roomCode);
 
+    // Must have 4 players
+    if (getNamesOfPlayersIn(roomCode, RED).length != 2 || getNamesOfPlayersIn(roomCode, BLUE).length != 2) return;
+
+    // Only allow host to start the game
+    if (room.host != client.id) return;
+
     room.players.forEach((playerId, i) => {
         io.to(playerId).emit('new-game', getNamesOfPlayersIn(roomCode), (RED_CODEMASTER == i || BLUE_CODEMASTER == i));
     });
+
+    newRound(client);
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -366,11 +390,13 @@ function guessCard(client, pos) {
     io.to(roomCode).emit('cover-card', pos, card.id);
     client.emit('made-guess', room.scores, room.guessesLeft);
 
+    // Handle game over
+    handleGameOver(client, card);
+
     // Right guess: Go again
     const isCorrect = getPlayer(client).team == card.id;
     const hasBonusGuess = room.guessesLeft == 0 && room.missed[getPlayer(client).team];
     if (isCorrect && hasBonusGuess) room.missed[getPlayer(client).team] -= 1;
-
 
     if (isCorrect && (room.guessesLeft > 0 || hasBonusGuess)) return;
 
@@ -393,6 +419,21 @@ function handleMissingCards(client) {
     const room = getRoom(getRoomCode(client));
 
     if (room.guessesLeft > 0) room.missed[getPlayer(client).team] += room.guessesLeft;
+}
+
+function handleGameOver(client, card) {
+    const roomCode = getRoomCode(client);
+    const room = getRoom(roomCode);
+
+    if (room.scores[card.id] <= 0) {
+        io.to(roomCode).emit('game-over', card.id, 'Found All Agents')
+        return;
+    }
+
+    if (card.id == ASSASSIN) {
+        io.to(roomCode).emit('game-over', getPlayer(client).team != RED ? RED : BLUE, 'Found The Assassin')
+        return;
+    }
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -428,7 +469,28 @@ function nextTurn(client, amount=0) {
 }
 
 // ----------------------------------------------------------------------------------------------------
-// 
+// Game Over Screen
+
+function changeTeams(client) {
+    const roomCode = getRoomCode(client);
+    const room = getRoom(roomCode);
+    const playerIds = room.players;
+    
+    playerIds.forEach(playerId => {
+        io.to(playerId).emit('joined-room', roomCode);
+        io.to(playerId).emit('update-players', getNamesOfPlayersIn(roomCode, RED), getNamesOfPlayersIn(roomCode, BLUE));
+    });
+}
+
+function nextGame(client) {
+    newRound(client);
+}
+
+function leaveGame(client) {
+    leaveRoom(client);
+    uncachePlayer(client);
+}
+
 // ----------------------------------------------------------------------------------------------------
 // 
 // ----------------------------------------------------------------------------------------------------
@@ -444,7 +506,7 @@ function getPlayer(client) {
 
 function getRoomCode(client) {
     const player = getPlayer(client);
-    if (player != null) return player.room;
+    if (player != null) return player.roomCode;
 
     console.log(`ERROR || Player not found:\nPlayer id of ${client.id} does not exist`);
     return null;

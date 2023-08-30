@@ -6,8 +6,8 @@ const client = io();
 
 /*
 NameScreen ->   HomeScreen ->   LobbyScreen ->  GameScreen ->   EndScreen
-Name inp.       Join but.       Join red but.   Flip but.       New Game but.
-Start but.      Create but.     Join blue but.  Main div.       Main div.
+Name inp.       Join but.       Join red but.   Main div.       New Game/Change Team/Home but.
+Start but.      Create but.     Join blue but.                  Main div.
                                 Play but.
 */
 
@@ -75,13 +75,14 @@ function init() {
 // Handle Server
 
 client.on('joined-room', joinRoom);
-client.on('update-players', updateLobbyScreen);
-client.on('new-game', initGame);
+client.on('update-players', updatePlayers);
+client.on('new-game', startGame);
 client.on('new-round', newRound);
 client.on('made-guess', madeGuess)
 client.on('cover-card', coverCard);
 client.on('recive-clue', reciveClue);
 client.on('next-turn', nextTurn);
+client.on('game-over', gameOver);
 
 // ----------------------------------------------------------------------------------------------------
 // Name Screen
@@ -177,8 +178,11 @@ function createHomeScreen() {
 }
 
 function removeHomeScreen() {
-    document.querySelector('.join-room-container').remove();
-    document.querySelector('.create-room-container').remove();
+    const join_room_container = document.querySelector('.join-room-container')
+    const create_room_container = document.querySelector('.create-room-container')
+
+    if (join_room_container != null) join_room_container.remove();
+    if (create_room_container != null) create_room_container.remove();
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -186,12 +190,16 @@ function removeHomeScreen() {
 
 //? from server
 //? transition | Home Screen => Lobby Screen
-function joinRoom(roomId, isHost) {
+function joinRoom(roomId, isHost=null) {
     // Set room id and host value
     user.roomCode = roomId;
-    user.isHost = isHost;
+    if (isHost != null) user.isHost = isHost;
 
-    // Create Looby screen
+    // Remove potential end screen
+    removeGameOverScreen();
+    removeGameScreen();
+
+    // Create Lobby screen
     removeHomeScreen();
     createLobbyScreen();
 }
@@ -210,19 +218,20 @@ function createLobbyScreen() {
     // Get main container
     const main_container = document.querySelector('.main');
 
+    // If room code hasn't been created already....
+    if (document.querySelector('.room-code-container') == null) {
+        // Create room code container
+        const room_code_container = newElem('div', 'room-code-container');
 
-    // Create room code container
-    const room_code_container = newElem('div', 'room-code-container');
+        // Create room code header
+        const room_code_header = newElem('h2');
+        room_code_header.textContent = user.roomCode;
 
-    // Create room code header
-    const room_code_header = newElem('h2');
-    room_code_header.textContent = user.roomCode;
+        addChild(room_code_container, room_code_header);
 
-    addChild(room_code_container, room_code_header);
-
-    // Add room code container to heading container
-    addChild(header_container, room_code_container)
-
+        // Add room code container to heading container
+        addChild(header_container, room_code_container)
+    }
 
     // Create red players container
     const red_players_container = newElem('div', 'red-players-container');
@@ -283,14 +292,12 @@ function createLobbyScreen() {
     const play_button = newElem('button', null, 'play-button');
     play_button.textContent = 'Play';
     play_button.disabled = true;
+    play_button.addEventListener('click', () => client.emit('new-game'));
 
     addChild(play_button_contianer, play_button);
 
     // add play button to screen
     addChild(main_container, play_button_contianer);
-
-    // add click functionality to play button
-    play_button.addEventListener('click', () => client.emit('new-game'));
 }
 
 function removeLobbyScreen() {
@@ -303,11 +310,20 @@ function removeLobbyScreen() {
 }
 
 //? from server
-function updateLobbyScreen(redTeam, blueTeam) {
+function updatePlayers(redTeam, blueTeam) {
 
     // Get main container
     const main_container = document.querySelector('.main');
-    if (main_container.classList.contains("playing-board")) return;
+    if (main_container.classList.contains("playing-board")) {
+        // Get game over new game button
+        const game_over_new_game_button  = document.getElementById('game-over-new-game-button');
+
+        if (game_over_new_game_button == null) return;
+        if (redTeam.length == 2 && blueTeam.length == 2) return;
+
+        game_over_new_game_button.disabled = true;
+        return;
+    }
     
     const join_red_button = document.getElementById('red-players-button');
     const join_blue_button = document.getElementById('blue-players-button');
@@ -347,7 +363,7 @@ function updateLobbyScreen(redTeam, blueTeam) {
 
 //? from server
 //? transition | Lobby Screen => Game Screen
-function initGame(playerNames, isSpymaster) {
+function startGame(playerNames, isSpymaster) {
     removeLobbyScreen();
     setSpymaster(isSpymaster);
     definePlayerRoles(playerNames)
@@ -361,20 +377,6 @@ function createGameScreen() {
 
     // Create playing board
     addClass(main_container, 'playing-board');
-
-
-    // Create flip button container
-    const flip_button_container = newElem('div', 'flip-button-container');
-
-    // Create flip button
-    const flip_button = newElem('button', null, 'flip-button');
-    flip_button.textContent = 'Flip';
-    flip_button.addEventListener("click", () => client.emit('new-round', user.roomCode));
-
-    addChild(flip_button_container, flip_button);
-
-    // Add flip button container to main container
-    addChild(main_container, flip_button_container);
 
 
     // Create card container
@@ -523,6 +525,22 @@ function createGameScreen() {
     addChild(main_container, game_log_container);
 }
 
+function removeGameScreen() {
+    // Get main container
+    const main_container = document.querySelector('.main');
+
+    // Tell CSS game is over
+    removeClass(main_container, 'playing-board');
+
+    // Get all elements in main container
+    const game_elements = Array.from(main_container.children);
+
+    // Remove all elements in main container
+    game_elements.forEach(game_element => {
+        game_element.remove();
+    });
+}
+
 function definePlayerRoles(playerNames) {
     players = playerNames;
 }
@@ -595,6 +613,7 @@ function gridCard(card, pos) {
 //? event | Empty Game Screen => Active Game Screen
 function newRound(cards, isSpymaster, turn, newScores, newFirst) {
     first = newFirst
+    removeGameOverScreen();
     setSpymaster(isSpymaster);
     clearLog();
     clearCovers();
@@ -695,7 +714,6 @@ function coverCard(pos, id) {
 
 function clearCovers() {
     const cards = document.querySelectorAll('.covered');
-    console.log(cards);
     cards.forEach(card => {
         removeClass(card, 'covered');
     })
@@ -714,8 +732,6 @@ function updateScoring(newScores) {
 
     const blue_score_heading = document.querySelector('.blue-score-heading');
     blue_score_heading.textContent = scores[BLUE];
-
-    //TODO HANDLE WINNING
 }
 
 //? from give-clue-button
@@ -949,6 +965,96 @@ function addBackText(card_back, text) {
         return;
     }
     removeClass(card_text, 'assassin');
+}
+
+// ----------------------------------------------------------------------------------------------------
+// Game Over Screen
+
+function gameOver(winningTeam, causeMessage) {
+    createGameOverScreen(winningTeam, causeMessage);
+}
+
+function createGameOverScreen(winningTeam, causeMessage) {
+
+    // Get main container
+    const main_container = document.querySelector('.main');
+
+
+    // Create game over container
+    const game_over_container = newElem('div', 'game-over-container');
+
+
+    // Create game over heading
+    const game_over_heading = newElem('h3', 'game-over-heading');
+    game_over_heading.textContent = `${CARDIDS[winningTeam].string.toUpperCase()} WINS!`;
+
+    addChild(game_over_container, game_over_heading);
+
+
+    // Create game over summary
+    const game_over_summary = newElem('p', 'game-over-summary');
+    game_over_summary.textContent = causeMessage;
+
+    addChild(game_over_container, game_over_summary);
+    
+
+    // Create game over new game container
+    const game_over_new_game_container = newElem('div', 'game-over-new-game-container');
+
+    // Create game over new game button
+    const game_over_new_game_button = newElem('button', null, 'game-over-new-game-button');
+    game_over_new_game_button.textContent = 'New Game';
+    game_over_new_game_button.addEventListener('click', () => {
+        client.emit('next-game');
+    });
+
+    addChild(game_over_new_game_container, game_over_new_game_button);
+    addChild(game_over_container, game_over_new_game_container);
+    
+
+    // Create game over new game container
+    const game_over_change_teams_container = newElem('div', 'game-over-change-teams-container');
+
+    // Create game over home button
+    const game_over_change_teams_button = newElem('button', null, 'game-over-change-teams-button');
+    game_over_change_teams_button.textContent = 'Change Teams';
+    game_over_change_teams_button.addEventListener('click', () => {
+        client.emit('change-teams');
+    });
+
+    addChild(game_over_change_teams_container, game_over_change_teams_button);
+    addChild(game_over_container, game_over_change_teams_container);
+    
+
+    // Create game over new game container
+    const game_over_home_container = newElem('div', 'game-over-home-container');
+
+    // Create game over home button
+    const game_over_home_button = newElem('button', null, 'game-over-home-button');
+    game_over_home_button.textContent = 'Home';
+    game_over_home_button.addEventListener('click', () => {
+        client.emit('leave-game');
+        removeGameOverScreen();
+        removeGameScreen();
+        removeLobbyScreen();
+        createHomeScreen();
+        user = {};
+    });
+
+    addChild(game_over_home_container, game_over_home_button);
+    addChild(game_over_container, game_over_home_container);
+
+
+    // Add game over container to main container
+    addChild(main_container, game_over_container);
+
+}
+
+function removeGameOverScreen() {
+    // Get game over container
+    const game_over_container = document.querySelector('.game-over-container');
+
+    if (game_over_container != null) game_over_container.remove();
 }
 
 // ----------------------------------------------------------------------------------------------------

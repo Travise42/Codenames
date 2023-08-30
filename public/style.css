@@ -617,3 +617,66 @@ button {
     height: 100%;
     width: 7rem;
 }
+
+.game-over-container {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 4rem;
+    width: 20rem;
+    height: 25rem;
+    padding-top: 0.5rem;
+    border: 5px solid var(--color-contrast);
+    border-radius: 2rem;
+    background: var(--color-primary);
+
+    text-align: center;
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    font-size: 1.3rem;
+
+    .game-over-heading {
+        position: relative;
+        font-size: 2rem;
+    }
+
+    .game-over-summary {
+        position: relative;
+    }
+    
+    .game-over-new-game-container {
+        position: relative;
+        margin-top: 3rem;
+        margin-bottom: 1rem;
+
+        #game-over-new-game-button {
+            position: relative;
+            width: 8rem;
+            height: 3rem;
+        }
+    }
+    
+    .game-over-change-teams-container {
+        position: relative;
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+
+        #game-over-change-teams-button {
+            position: relative;
+            width: 10rem;
+            height: 3rem;
+        }
+    }
+    
+    .game-over-home-container {
+        position: relative;
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+
+        #game-over-home-button {
+            position: relative;
+            width: 5rem;
+            height: 3rem;
+        }
+    }
+    
+}
