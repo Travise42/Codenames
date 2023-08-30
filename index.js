@@ -1,26 +1,27 @@
-
 // ----------------------------------------------------------------------------------------------------
 // Import Functions
 
-const {randIntBetween, randInt, randFrom} = require('./func.js');
+const { randIntBetween, randInt, randFrom } = require("./func.js");
 
 // ----------------------------------------------------------------------------------------------------
 // Initiate Server
 
-const express = require('express');
+const express = require("express");
 const app = express();
-const http = require('http').Server(app);
-const io = require('socket.io')(http);
+const http = require("http").Server(app);
+const io = require("socket.io")(http);
 const port = process.env.PORT || 5500;
-app.use(express.static('public'));
-app.use('/img', express.static('img'));
+app.use(express.static("public"));
+app.use("/img", express.static("img"));
 
-app.get('/', (req, res) => {
-    res.setHeader('Content-Type', 'text/html');
+app.get("/", (req, res) => {
+    res.setHeader("Content-Type", "text/html");
     res.sendFile(`${__dirname}/index.html`);
 });
 
-http.listen(port, () => console.log(`Socket.IO server running at http://localhost:${port}/`));
+http.listen(port, () =>
+    console.log(`Socket.IO server running at http://localhost:${port}/`)
+);
 
 // ----------------------------------------------------------------------------------------------------
 // Define Constants
@@ -38,13 +39,13 @@ const RED_OPPERATIVE = 1;
 const BLUE_CODEMASTER = 2;
 const BLUE_OPPERATIVE = 3;
 
-const COLUMNS = ['a', 'b', 'c', 'd', 'e'];
+const COLUMNS = ["a", "b", "c", "d", "e"];
 
 // ----------------------------------------------------------------------------------------------------
 // Import Data
 
 //? get words from json file
-const words = require('./words.json').map(a => a.toUpperCase());
+const words = require("./words.json").map((a) => a.toUpperCase());
 
 // ----------------------------------------------------------------------------------------------------
 // Caches for Rooms & Players
@@ -107,27 +108,26 @@ const players = {};
 // Handle Sockets
 
 //TODO - OPTIMIZE
-io.on('connection', client => {
-
+io.on("connection", (client) => {
     // Home screen
-    client.on('create-room', (...args) => createRoom(client, ...args));
-    client.on('join-room', (...args) => joinRoom(client, ...args));
-    client.on('join-team', (...args) => joinTeam(client, ...args));
-    client.on('new-game', () => newGame(client));
-    
+    client.on("create-room", (...args) => createRoom(client, ...args));
+    client.on("join-room", (...args) => joinRoom(client, ...args));
+    client.on("join-team", (...args) => joinTeam(client, ...args));
+    client.on("new-game", () => newGame(client));
+
     // game screen
-    client.on('pass-guess', () => passGuess(client));
-    client.on('guess-card', (...args) => guessCard(client, ...args));
-    client.on('give-clue', (...args) => giveClue(client, ...args));
+    client.on("pass-guess", () => passGuess(client));
+    client.on("guess-card", (...args) => guessCard(client, ...args));
+    client.on("give-clue", (...args) => giveClue(client, ...args));
 
     // game over screen
-    client.on('ping-change-teams', () => pingChangeTeams(client));
-    client.on('change-teams', () => changeTeams(client));
-    client.on('next-game', () => nextGame(client));
-    client.on('leave-game', () => leaveGame(client));
+    client.on("ping-change-teams", () => pingChangeTeams(client));
+    client.on("change-teams", () => changeTeams(client));
+    client.on("next-game", () => nextGame(client));
+    client.on("leave-game", () => leaveGame(client));
 
     // leaving game
-    client.on('disconnect', () => leaveGame(client));
+    client.on("disconnect", () => leaveGame(client));
 });
 
 // ----------------------------------------------------------------------------------------------------
@@ -145,7 +145,7 @@ function cachePlayer(client, roomCode, nickname) {
     players[client.id] = {
         id: client.id,
         roomCode: roomCode,
-        name: nickname
+        name: nickname,
     };
 }
 
@@ -154,7 +154,6 @@ function uncachePlayer(client) {
 }
 
 function newRoom(roomCode) {
-    
     rooms[roomCode] = {
         roomCode: roomCode,
         players: [],
@@ -163,7 +162,7 @@ function newRoom(roomCode) {
         first: randInt(2),
         scores: {},
         guessesLeft: 0,
-        missed: {1: 0, 2: 0}
+        missed: { 1: 0, 2: 0 },
     };
 
     /*
@@ -187,15 +186,15 @@ function newRoom(roomCode) {
     */
 
     const room = getRoom(roomCode);
-    COLUMNS.forEach(column => {
+    COLUMNS.forEach((column) => {
         for (let row = 1; row <= 5; row++) {
             let pos = column + row;
             room.cards[pos] = {
                 pos: pos,
                 id: INNOCENT,
-                text: '',
-                covered: false
-            }
+                text: "",
+                covered: false,
+            };
         }
     });
 
@@ -205,9 +204,13 @@ function newRoom(roomCode) {
 //TODO - OPTIMIZE
 //? from a client
 function createRoom(client, nickname) {
-    do { var roomCode = randIntBetween(0, 10).toString() + randIntBetween(0, 10).toString() + randIntBetween(0, 10).toString();
+    do {
+        var roomCode =
+            randIntBetween(0, 10).toString() +
+            randIntBetween(0, 10).toString() +
+            randIntBetween(0, 10).toString();
     } while (getRoomCodes().includes(roomCode));
-    
+
     joinRoom(client, newRoom(roomCode), nickname, true);
 }
 
@@ -215,7 +218,11 @@ function createRoom(client, nickname) {
 //? from a client
 function joinRoom(client, roomCode, nickname, isHost = false) {
     if (rooms[roomCode] == null) return;
-    if (!isHost && Array.from(io.sockets.adapter.rooms.get(roomCode)).length >= 4) return;
+    if (
+        !isHost &&
+        Array.from(io.sockets.adapter.rooms.get(roomCode)).length >= 4
+    )
+        return;
 
     // Add player to room
     client.join(roomCode);
@@ -223,8 +230,12 @@ function joinRoom(client, roomCode, nickname, isHost = false) {
     if (isHost) getRoom(roomCode).host = client.id;
 
     // Announce to new player that they have joined
-    client.emit('joined-room', roomCode, isHost);
-    client.emit('update-players', getNamesOfPlayersIn(roomCode, RED), getNamesOfPlayersIn(roomCode, BLUE));
+    client.emit("joined-room", roomCode, isHost);
+    client.emit(
+        "update-players",
+        getNamesOfPlayersIn(roomCode, RED),
+        getNamesOfPlayersIn(roomCode, BLUE)
+    );
 }
 
 //? uncachePlayer must NOT be called before leaveRoom
@@ -240,12 +251,19 @@ function leaveRoom(client) {
     const playerIds = room.players;
 
     client.leave(roomCode);
-    rooms[roomCode].players.splice(rooms[roomCode].players.indexOf(client.id), 1);
+    rooms[roomCode].players.splice(
+        rooms[roomCode].players.indexOf(client.id),
+        1
+    );
 
     // If anyone is left in the room...
     if (playerIds.length) {
         // Tell players this player left the room
-        io.to(roomCode).emit('update-players', getNamesOfPlayersIn(roomCode, RED), getNamesOfPlayersIn(roomCode, BLUE));
+        io.to(roomCode).emit(
+            "update-players",
+            getNamesOfPlayersIn(roomCode, RED),
+            getNamesOfPlayersIn(roomCode, BLUE)
+        );
         return;
     }
 
@@ -272,7 +290,11 @@ function joinTeam(client, team) {
     else roomPlayers.push(client.id);
 
     // Tell players about the new player that joined
-    io.to(roomCode).emit('update-players', getNamesOfPlayersIn(roomCode, RED), getNamesOfPlayersIn(roomCode, BLUE));
+    io.to(roomCode).emit(
+        "update-players",
+        getNamesOfPlayersIn(roomCode, RED),
+        getNamesOfPlayersIn(roomCode, BLUE)
+    );
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -285,13 +307,21 @@ function newGame(client) {
     const room = getRoom(roomCode);
 
     // Must have 4 players
-    if (getNamesOfPlayersIn(roomCode, RED).length != 2 || getNamesOfPlayersIn(roomCode, BLUE).length != 2) return;
+    if (
+        getNamesOfPlayersIn(roomCode, RED).length != 2 ||
+        getNamesOfPlayersIn(roomCode, BLUE).length != 2
+    )
+        return;
 
     // Only allow host to start the game
     if (room.host != client.id) return;
 
     room.players.forEach((playerId, i) => {
-        io.to(playerId).emit('new-game', getNamesOfPlayersIn(roomCode), (RED_CODEMASTER == i || BLUE_CODEMASTER == i));
+        io.to(playerId).emit(
+            "new-game",
+            getNamesOfPlayersIn(roomCode),
+            RED_CODEMASTER == i || BLUE_CODEMASTER == i
+        );
     });
 
     newRound(client);
@@ -321,21 +351,27 @@ function newRound(client) {
     const room = getRoom(roomCode);
 
     // Change which team goes first
-    room.first = (room.first != RED) ? RED : BLUE;
+    room.first = room.first != RED ? RED : BLUE;
 
-    room.turn = (room.first == RED) ? RED_CODEMASTER : BLUE_CODEMASTER;
+    room.turn = room.first == RED ? RED_CODEMASTER : BLUE_CODEMASTER;
 
     // Change who is code master
     //? [0, 1, 2, 3] => [1, 0, 3, 2]
-    room.players = room.players.splice(0, 2).reverse().concat(room.players.splice(0, 2).reverse());
-    
+    room.players = room.players
+        .splice(0, 2)
+        .reverse()
+        .concat(room.players.splice(0, 2).reverse());
+
     // Create layout ids
-    const cardIds = setCards( setCards( setCards( setCards(
-        Array(25).fill(DEFAULT), 
-        8, RED ),
-        8, BLUE ),
-        1, room.first ),
-        1, ASSASSIN );
+    const cardIds = setCards(
+        setCards(
+            setCards(setCards(Array(25).fill(DEFAULT), 8, RED), 8, BLUE),
+            1,
+            room.first
+        ),
+        1,
+        ASSASSIN
+    );
 
     // Create layout texts
     const card_texts = randFrom(words, 25);
@@ -347,23 +383,32 @@ function newRound(client) {
             pos: pos,
             id: cardIds[i],
             text: card_texts[i],
-            covered: false
+            covered: false,
         };
     });
 
     // Create new scores
-    room.scores = {1: 8, 2: 8};
+    room.scores = { 1: 8, 2: 8 };
     room.scores[room.first] += 1;
-    
+
     // Broadcast new layout
-    room.players.forEach(playerId => {
-        const alteredCards = Object.values(cards).map(card => ({...card}));
-        const spymaster = (room.players[RED_CODEMASTER] == playerId || room.players[BLUE_CODEMASTER] == playerId);
-        if (!spymaster) alteredCards.forEach(card => card.id = INNOCENT);
+    room.players.forEach((playerId) => {
+        const alteredCards = Object.values(cards).map((card) => ({ ...card }));
+        const spymaster =
+            room.players[RED_CODEMASTER] == playerId ||
+            room.players[BLUE_CODEMASTER] == playerId;
+        if (!spymaster) alteredCards.forEach((card) => (card.id = INNOCENT));
         const turn = room.turn;
         const scores = room.scores;
         const first = room.first;
-        io.to(playerId).emit('new-round', alteredCards, spymaster, turn, scores, first);
+        io.to(playerId).emit(
+            "new-round",
+            alteredCards,
+            spymaster,
+            turn,
+            scores,
+            first
+        );
     });
 }
 
@@ -387,15 +432,16 @@ function guessCard(client, pos) {
     card.covered = true;
     if (room.scores[card.id] != null) room.scores[card.id] -= 1;
     room.guessesLeft -= 1;
-    io.to(roomCode).emit('cover-card', pos, card.id);
-    client.emit('made-guess', room.scores, room.guessesLeft);
+    io.to(roomCode).emit("cover-card", pos, card.id);
+    client.emit("made-guess", room.scores, room.guessesLeft);
 
     // Handle game over
     handleGameOver(client, card);
 
     // Right guess: Go again
     const isCorrect = getPlayer(client).team == card.id;
-    const hasBonusGuess = room.guessesLeft == 0 && room.missed[getPlayer(client).team];
+    const hasBonusGuess =
+        room.guessesLeft == 0 && room.missed[getPlayer(client).team];
     if (isCorrect && hasBonusGuess) room.missed[getPlayer(client).team] -= 1;
 
     if (isCorrect && (room.guessesLeft > 0 || hasBonusGuess)) return;
@@ -418,7 +464,8 @@ function passGuess(client) {
 function handleMissingCards(client) {
     const room = getRoom(getRoomCode(client));
 
-    if (room.guessesLeft > 0) room.missed[getPlayer(client).team] += room.guessesLeft;
+    if (room.guessesLeft > 0)
+        room.missed[getPlayer(client).team] += room.guessesLeft;
 }
 
 function handleGameOver(client, card) {
@@ -426,12 +473,16 @@ function handleGameOver(client, card) {
     const room = getRoom(roomCode);
 
     if (room.scores[card.id] <= 0) {
-        io.to(roomCode).emit('game-over', card.id, 'Found All Agents')
+        io.to(roomCode).emit("game-over", card.id, "Found All Agents");
         return;
     }
 
     if (card.id == ASSASSIN) {
-        io.to(roomCode).emit('game-over', getPlayer(client).team != RED ? RED : BLUE, 'Found The Assassin')
+        io.to(roomCode).emit(
+            "game-over",
+            getPlayer(client).team != RED ? RED : BLUE,
+            "Found The Assassin"
+        );
         return;
     }
 }
@@ -450,7 +501,13 @@ function giveClue(client, clue, amount) {
     if (!clue) return;
 
     room.guessesLeft = amount;
-    io.to(roomCode).emit('recive-clue', clue.toUpperCase(), amount, getPlayer(client).name, getPlayer(client).team);
+    io.to(roomCode).emit(
+        "recive-clue",
+        clue.toUpperCase(),
+        amount,
+        getPlayer(client).name,
+        getPlayer(client).team
+    );
 
     // Next Turn
     nextTurn(client, amount);
@@ -459,13 +516,13 @@ function giveClue(client, clue, amount) {
 // ----------------------------------------------------------------------------------------------------
 // Handle Turns
 
-function nextTurn(client, amount=0) {
+function nextTurn(client, amount = 0) {
     const roomCode = getRoomCode(client);
     const room = getRoom(roomCode);
-    
+
     room.turn = (room.turn + 1) % 4;
 
-    io.to(roomCode).emit('next-turn', room.turn, amount);
+    io.to(roomCode).emit("next-turn", room.turn, amount);
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -475,10 +532,14 @@ function changeTeams(client) {
     const roomCode = getRoomCode(client);
     const room = getRoom(roomCode);
     const playerIds = room.players;
-    
-    playerIds.forEach(playerId => {
-        io.to(playerId).emit('joined-room', roomCode);
-        io.to(playerId).emit('update-players', getNamesOfPlayersIn(roomCode, RED), getNamesOfPlayersIn(roomCode, BLUE));
+
+    playerIds.forEach((playerId) => {
+        io.to(playerId).emit("joined-room", roomCode);
+        io.to(playerId).emit(
+            "update-players",
+            getNamesOfPlayersIn(roomCode, RED),
+            getNamesOfPlayersIn(roomCode, BLUE)
+        );
     });
 }
 
@@ -492,7 +553,7 @@ function leaveGame(client) {
 }
 
 // ----------------------------------------------------------------------------------------------------
-// 
+//
 // ----------------------------------------------------------------------------------------------------
 // Room Functions
 
@@ -500,15 +561,19 @@ function getPlayer(client) {
     const player = players[client.id];
     if (player != null) return player;
 
-    console.log(`ERROR || Player not found:\nPlayer id of ${client.id} does not exist`);
-    return {id: client.id, room: null, name: '<<<ERROR>>>'};
+    console.log(
+        `ERROR || Player not found:\nPlayer id of ${client.id} does not exist`
+    );
+    return { id: client.id, room: null, name: "<<<ERROR>>>" };
 }
 
 function getRoomCode(client) {
     const player = getPlayer(client);
     if (player != null) return player.roomCode;
 
-    console.log(`ERROR || Player not found:\nPlayer id of ${client.id} does not exist`);
+    console.log(
+        `ERROR || Player not found:\nPlayer id of ${client.id} does not exist`
+    );
     return null;
 }
 
@@ -517,16 +582,30 @@ function getRoom(roomCode) {
     const room = rooms[roomCode];
     if (room != null) return room;
 
-    console.log(`ERROR || Room not found:\nRoom code of ${roomCode} does not exist`);
-    return {code: roomCode, players: [], cards: {}, first: 0, scores: {}, guessesLeft: 0, missed: {1: 0, 2: 0}};
+    console.log(
+        `ERROR || Room not found:\nRoom code of ${roomCode} does not exist`
+    );
+    return {
+        code: roomCode,
+        players: [],
+        cards: {},
+        first: 0,
+        scores: {},
+        guessesLeft: 0,
+        missed: { 1: 0, 2: 0 },
+    };
 }
 
 function getNamesOfPlayersIn(roomCode, team = null) {
     if (team == null) {
-        return getRoom(roomCode).players.map(playerId => players[playerId].name);
+        return getRoom(roomCode).players.map(
+            (playerId) => players[playerId].name
+        );
     }
 
-    return getRoom(roomCode).players.filter(playerId => players[playerId].team == team).map(playerId => players[playerId].name);
+    return getRoom(roomCode)
+        .players.filter((playerId) => players[playerId].team == team)
+        .map((playerId) => players[playerId].name);
 }
 
 function getRoomCodes() {
@@ -540,5 +619,3 @@ function getActivePlayerId(roomCode) {
 }
 
 // ----------------------------------------------------------------------------------------------------
-
-
