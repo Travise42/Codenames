@@ -15,7 +15,7 @@ function randFrom(arr, count) {
         usedIndexes.push(randIndex);
         i++;
     }
-    return usedIndexes.map(i => arr[i]);
+    return usedIndexes.map((i) => arr[i]);
 }
 
 module.exports = { randIntBetween, randInt, randFrom };

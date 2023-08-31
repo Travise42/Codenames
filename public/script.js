@@ -54,10 +54,8 @@ const BOTTOM_LEFT = 1;
 const TOP_RIGHT = 2;
 const BOTTOM_RIGHT = 3;
 
-let RED_SPYMASTER = 0;
-let RED_OPPERATIVE = 1;
-let BLUE_SPYMASTER = 2;
-let BLUE_OPPERATIVE = 3;
+const OPPERATIVE = 0;
+const SPYMASTER = 1;
 
 const COLUMNS = ["a", "b", "c", "d", "e"];
 
@@ -97,6 +95,7 @@ client.on("joined-room", joinRoom);
 client.on("update-players", updatePlayers);
 client.on("new-game", startGame);
 client.on("new-round", newRound);
+client.on("player-left", playerLeft);
 client.on("made-guess", madeGuess);
 client.on("cover-card", coverCard);
 client.on("recive-clue", reciveClue);
@@ -130,9 +129,7 @@ function createNameScreen() {
     // create start button
     const name_button_element = newElem("button", null, "name-button");
     name_button_element.textContent = "Play";
-    name_button_element.addEventListener("click", () =>
-        submitName(name_input_element.value)
-    );
+    name_button_element.addEventListener("click", () => submitName(name_input_element.value));
 
     addChild(name_container, name_button_element);
 
@@ -178,9 +175,7 @@ function createHomeScreen() {
     // Create join room button
     const join_room_button = newElem("button", null, "join-room-button");
     join_room_button.textContent = "Join Room";
-    join_room_button.addEventListener("click", () =>
-        client.emit("join-room", join_room_input.value, user.name)
-    );
+    join_room_button.addEventListener("click", () => client.emit("join-room", join_room_input.value, user.name));
 
     addChild(join_room_contianer, join_room_button);
 
@@ -192,9 +187,7 @@ function createHomeScreen() {
 
     const create_room_button = newElem("button", null, "create-room-button");
     create_room_button.textContent = "Create Room";
-    create_room_button.addEventListener("click", () =>
-        client.emit("create-room", user.name)
-    );
+    create_room_button.addEventListener("click", () => client.emit("create-room", user.name));
 
     addChild(create_room_contianer, create_room_button);
 
@@ -204,9 +197,7 @@ function createHomeScreen() {
 
 function removeHomeScreen() {
     const join_room_container = document.querySelector(".join-room-container");
-    const create_room_container = document.querySelector(
-        ".create-room-container"
-    );
+    const create_room_container = document.querySelector(".create-room-container");
 
     if (join_room_container != null) join_room_container.remove();
     if (create_room_container != null) create_room_container.remove();
@@ -217,7 +208,7 @@ function removeHomeScreen() {
 
 //? from server
 //? transition | Home Screen => Lobby Screen
-function joinRoom(roomId, isHost = null) {
+function joinRoom(roomId, roomStatus, isHost = null) {
     // Set room id and host value
     user.roomCode = roomId;
     if (isHost != null) user.isHost = isHost;
@@ -228,7 +219,7 @@ function joinRoom(roomId, isHost = null) {
 
     // Create Lobby screen
     removeHomeScreen();
-    createLobbyScreen();
+    createLobbyScreen(roomStatus);
 }
 
 //? from red-players-button
@@ -237,7 +228,7 @@ function joinTeam(team) {
     client.emit("join-team", user.team);
 }
 
-function createLobbyScreen() {
+function createLobbyScreen(roomStatus) {
     // Get header container
     const header_container = document.querySelector(".header");
 
@@ -308,7 +299,7 @@ function createLobbyScreen() {
     addChild(main_container, blue_players_container);
 
     // Stop if user is not host
-    if (!user.isHost) return;
+    if (!user.isHost || roomStatus != "lobby") return;
 
     // create play button if user is host
     const play_button_contianer = newElem("div", "play-button-container");
@@ -333,15 +324,25 @@ function removeLobbyScreen() {
     document.querySelector(".play-button-container").remove();
 }
 
+function playerLeft(playerRole, roomStatus) {
+    if (roomStatus != "game") return;
+
+    const nametags = {};
+    nametags[TOP_LEFT] = document.querySelector(".topleft-nametag-container");
+    nametags[BOTTOM_LEFT] = document.querySelector(".bottomleft-nametag-container");
+    nametags[TOP_RIGHT] = document.querySelector(".topright-nametag-container");
+    nametags[BOTTOM_RIGHT] = document.querySelector(".bottomright-nametag-container");
+
+    nametags[(playerRole[0] == BLUE) * 2 + playerRole[1]].textContent = "DISCONNECTED";
+}
+
 //? from server
-function updatePlayers(redTeam, blueTeam) {
+function updatePlayers(redTeam, blueTeam, roomStatus) {
     // Get main container
     const main_container = document.querySelector(".main");
     if (main_container.classList.contains("playing-board")) {
         // Get game over new game button
-        const game_over_new_game_button = document.getElementById(
-            "game-over-new-game-button"
-        );
+        const game_over_new_game_button = document.getElementById("game-over-new-game-button");
 
         if (game_over_new_game_button == null) return;
         if (redTeam.length == 2 && blueTeam.length == 2) return;
@@ -356,8 +357,8 @@ function updatePlayers(redTeam, blueTeam) {
     const red_players_list = document.getElementById("red-players-list");
     const blue_players_list = document.getElementById("blue-players-list");
 
-    join_red_button.disabled = user.team == RED;
-    join_blue_button.disabled = user.team == BLUE;
+    join_red_button.disabled = user.team == RED || (roomStatus == "game" && redTeam.length >= 2);
+    join_blue_button.disabled = user.team == BLUE || (roomStatus == "game" && blueTeam.length >= 2);
 
     document.querySelectorAll(".room-player").forEach((li) => li.remove());
 
@@ -377,10 +378,7 @@ function updatePlayers(redTeam, blueTeam) {
 
     if (!user.isHost) return;
 
-    if (
-        red_players_list.children.length >= 2 &&
-        blue_players_list.children.length >= 2
-    ) {
+    if (red_players_list.children.length >= 2 && blue_players_list.children.length >= 2) {
         const play_button = document.getElementById("play-button");
         play_button.disabled = false;
     }
@@ -413,14 +411,9 @@ function createGameScreen() {
     COLUMNS.forEach((column) => {
         for (var row = 1; row <= 5; row++) {
             // Create card pos
-            const card_pos = newElem(
-                "div",
-                `card-pos-${column}${row}`,
-                `${column}${row}`
-            );
+            const card_pos = newElem("div", `card-pos-${column}${row}`, `${column}${row}`);
             card_pos.addEventListener("click", () => {
-                if (!card_pos.firstChild.classList.contains("clickable"))
-                    return;
+                if (!card_pos.firstChild.classList.contains("clickable")) return;
                 guessCard(card_pos.id);
             });
 
@@ -432,17 +425,13 @@ function createGameScreen() {
     addChild(main_container, card_container);
 
     // Create topleft nametag container
-    const topleft_nametag_container = newElem(
-        "div",
-        "topleft-nametag-container"
-    );
+    const topleft_nametag_container = newElem("div", "topleft-nametag-container");
     addClass(topleft_nametag_container, "red");
 
     // Create topleft nametag label
     const topleft_nametag_label = newElem("h3", "topleft-nametag-label");
     topleft_nametag_label.textContent = players[TOP_LEFT].toUpperCase();
-    if (user.role == RED_SPYMASTER)
-        topleft_nametag_label.textContent += " (YOU)";
+    if (user.role == [RED, OPPERATIVE]) topleft_nametag_label.textContent += " (YOU)";
 
     addChild(topleft_nametag_container, topleft_nametag_label);
 
@@ -450,17 +439,13 @@ function createGameScreen() {
     addChild(main_container, topleft_nametag_container);
 
     // Create bottomleft nametag container
-    const bottomleft_nametag_container = newElem(
-        "div",
-        "bottomleft-nametag-container"
-    );
+    const bottomleft_nametag_container = newElem("div", "bottomleft-nametag-container");
     addClass(bottomleft_nametag_container, "red");
 
     // Create bottomleft nametag label
     const bottomleft_nametag_label = newElem("h3", "bottomleft-nametag-label");
     bottomleft_nametag_label.textContent = players[BOTTOM_LEFT].toUpperCase();
-    if (user.role == RED_OPPERATIVE)
-        bottomleft_nametag_label.textContent += " (YOU)";
+    if (user.role == [RED, SPYMASTER]) bottomleft_nametag_label.textContent += " (YOU)";
 
     addChild(bottomleft_nametag_container, bottomleft_nametag_label);
 
@@ -468,17 +453,13 @@ function createGameScreen() {
     addChild(main_container, bottomleft_nametag_container);
 
     // Create topright nametag container
-    const topright_nametag_container = newElem(
-        "div",
-        "topright-nametag-container"
-    );
+    const topright_nametag_container = newElem("div", "topright-nametag-container");
     addClass(topright_nametag_container, "blue");
 
     // Create topright nametag label
     const topright_nametag_label = newElem("h3", "topright-nametag-label");
     topright_nametag_label.textContent = players[TOP_RIGHT].toUpperCase();
-    if (user.role == BLUE_SPYMASTER)
-        topright_nametag_label.textContent += " (YOU)";
+    if (user.role == [BLUE, OPPERATIVE]) topright_nametag_label.textContent += " (YOU)";
 
     addChild(topright_nametag_container, topright_nametag_label);
 
@@ -486,20 +467,13 @@ function createGameScreen() {
     addChild(main_container, topright_nametag_container);
 
     // Create bottomright nametag container
-    const bottomright_nametag_container = newElem(
-        "div",
-        "bottomright-nametag-container"
-    );
+    const bottomright_nametag_container = newElem("div", "bottomright-nametag-container");
     addClass(bottomright_nametag_container, "blue");
 
     // Create bottomright nametag label
-    const bottomright_nametag_label = newElem(
-        "h3",
-        "bottomright-nametag-label"
-    );
+    const bottomright_nametag_label = newElem("h3", "bottomright-nametag-label");
     bottomright_nametag_label.textContent = players[BOTTOM_RIGHT].toUpperCase();
-    if (user.role == BLUE_OPPERATIVE)
-        bottomright_nametag_label.textContent += " (YOU)";
+    if (user.role == [BLUE, SPYMASTER]) bottomright_nametag_label.textContent += " (YOU)";
 
     addChild(bottomright_nametag_container, bottomright_nametag_label);
 
@@ -684,11 +658,7 @@ function addClueInput() {
     addChild(give_clue_container, clue_input);
 
     // Create clue amount input
-    const clue_amount_input = newElem(
-        "input",
-        "clue-amount-input",
-        "clue-amount-input"
-    );
+    const clue_amount_input = newElem("input", "clue-amount-input", "clue-amount-input");
     clue_amount_input.type = "number";
     clue_amount_input.value = 1;
     clue_amount_input.min = 0;
@@ -697,11 +667,7 @@ function addClueInput() {
     addChild(give_clue_container, clue_amount_input);
 
     // Create give clue button
-    const give_clue_button = newElem(
-        "button",
-        "give-clue-button",
-        "give-clue-button"
-    );
+    const give_clue_button = newElem("button", "give-clue-button", "give-clue-button");
     give_clue_button.textContent = "Give Clue";
 
     addChild(give_clue_container, give_clue_button);
@@ -720,9 +686,7 @@ function removeClueInput() {
 
 function editCards(cards) {
     cards.forEach((card) => {
-        const card_element = document.querySelector(
-            `.card-pos-${card.pos}`
-        ).firstChild;
+        const card_element = document.querySelector(`.card-pos-${card.pos}`).firstChild;
 
         const card_back = getCardBack(card_element);
         addBackID(card_back, card.id);
@@ -732,16 +696,12 @@ function editCards(cards) {
 }
 
 function flipCards() {
-    document
-        .querySelectorAll(".card")
-        .forEach((card) => addClass(card.firstChild, "flipped"));
+    document.querySelectorAll(".card").forEach((card) => addClass(card.firstChild, "flipped"));
 }
 
 function unflipCards(cards) {
     editCards(cards);
-    document
-        .querySelectorAll(".card")
-        .forEach((card) => removeClass(card.firstChild, "flipped"));
+    document.querySelectorAll(".card").forEach((card) => removeClass(card.firstChild, "flipped"));
 }
 
 //? from card-pos-<pos>
@@ -759,12 +719,7 @@ function coverCard(pos, id) {
     const card_cover = newElem("div", "card-cover");
     addClass(card_cover, "new");
     const card_cover_img = newElem("img", "card-img");
-    addPath(
-        card_cover_img,
-        CARDIDS[id].cover_paths[
-            parseInt(pos.charAt(1)) % CARDIDS[id].cover_paths.length
-        ]
-    );
+    addPath(card_cover_img, CARDIDS[id].cover_paths[parseInt(pos.charAt(1)) % CARDIDS[id].cover_paths.length]);
     addChild(card_cover, card_cover_img);
 
     // Add card cover to screen
@@ -805,19 +760,14 @@ function giveClue() {
     if (!clue_element.value) return;
 
     // Check if clue is already a word on the board
-    const card_poses = Array.from(
-        document.querySelector(".card-container").children
-    );
+    const card_poses = Array.from(document.querySelector(".card-container").children);
     const duplicates = [];
     card_poses.forEach((card_pos) => {
         const card = card_pos.firstChild;
         const inner = card.firstChild;
         if (inner.lastChild.className == "card-cover") return;
         removeClass(card_pos, "invalid");
-        if (
-            clue_element.value.toLowerCase() ==
-            inner.firstChild.lastChild.textContent.toLowerCase()
-        )
+        if (clue_element.value.toLowerCase() == inner.firstChild.lastChild.textContent.toLowerCase())
             duplicates.push(card_pos);
     });
     if (duplicates.length) {
@@ -838,8 +788,7 @@ function madeGuess(newScores, guessesLeft = user.guesses) {
     // Get turn indicator
     const turn_indicator = document.querySelector(".turn-indicator");
 
-    turn_indicator.textContent =
-        "Your Turn... " + (user.guesses - guessesLeft) + "/" + user.guesses;
+    turn_indicator.textContent = "Your Turn... " + (user.guesses - guessesLeft) + "/" + user.guesses;
 
     // Check if pass button shoud
     if (guessesLeft <= 0) return;
@@ -868,9 +817,7 @@ function createPassButton() {
 
 function removePassButton() {
     // Get pass button container
-    const pass_button_container = document.querySelector(
-        ".pass-button-container"
-    );
+    const pass_button_container = document.querySelector(".pass-button-container");
     if (pass_button_container != null) pass_button_container.remove();
 }
 
@@ -911,30 +858,22 @@ function addPlayingElements() {
     removePlayingElements();
 
     if (user.isSpymaster) addClueInput();
-    else
-        document
-            .querySelectorAll(".card")
-            .forEach((card_element) => addClass(card_element, "clickable"));
+    else document.querySelectorAll(".card").forEach((card_element) => addClass(card_element, "clickable"));
 }
 
 function removePlayingElements() {
-    document
-        .querySelectorAll(".card")
-        .forEach((card_element) => removeClass(card_element, "clickable"));
+    document.querySelectorAll(".card").forEach((card_element) => removeClass(card_element, "clickable"));
     removeClueInput();
     removePassButton();
 }
 
 function editTurnIndicator() {
-    // Edit turn-indicator to tell the player whos turn it is
-    const [team, isSpymaster] = getRoleAttributes(turn);
-
     const turn_indicator = document.querySelector(".turn-indicator");
 
     updateHighlightedNametags();
 
-    if (user.team == team) {
-        if (user.isSpymaster == isSpymaster) {
+    if (user.team == turn.team) {
+        if (user.isSpymaster == turn.isSpymaster) {
             if (!user.isSpymaster) {
                 // Your turn (opperative)
                 turn_indicator.textContent = "Your Turn... 0/" + user.guesses;
@@ -965,22 +904,15 @@ function editTurnIndicator() {
 }
 
 function updateHighlightedNametags() {
-    const nametags = {};
-    nametags[RED_SPYMASTER] = document.querySelector(
-        ".topleft-nametag-container"
-    );
-    nametags[RED_OPPERATIVE] = document.querySelector(
-        ".bottomleft-nametag-container"
-    );
-    nametags[BLUE_SPYMASTER] = document.querySelector(
-        ".topright-nametag-container"
-    );
-    nametags[BLUE_OPPERATIVE] = document.querySelector(
-        ".bottomright-nametag-container"
-    );
+    const nametags = [
+        document.querySelector(".topleft-nametag-container"),
+        document.querySelector(".bottomleft-nametag-container"),
+        document.querySelector(".topright-nametag-container"),
+        document.querySelector(".bottomright-nametag-container"),
+    ];
 
     // Remove highlight from everyone
-    Object.values(nametags).forEach((nametag) => {
+    nametags.forEach((nametag) => {
         removeClass(nametag, "active");
     });
 
@@ -1002,19 +934,7 @@ function updateRole() {
 }
 
 function rotateRoles() {
-    if (TOP_LEFT == RED_SPYMASTER) {
-        RED_SPYMASTER = 1;
-        RED_OPPERATIVE = 0;
-        BLUE_SPYMASTER = 3;
-        BLUE_OPPERATIVE = 2;
-
-        return;
-    }
-
-    RED_SPYMASTER = 0;
-    RED_OPPERATIVE = 1;
-    BLUE_SPYMASTER = 2;
-    BLUE_OPPERATIVE = 3;
+    [SPYMASTER, CODEMASTER] = [CODEMASTER, SPYMASTER];
 }
 
 function getRoleAttributes(role) {
@@ -1066,9 +986,7 @@ function createGameOverScreen(winningTeam, causeMessage) {
 
     // Create game over heading
     const game_over_heading = newElem("h3", "game-over-heading");
-    game_over_heading.textContent = `${CARDIDS[
-        winningTeam
-    ].string.toUpperCase()} WINS!`;
+    game_over_heading.textContent = `${CARDIDS[winningTeam].string.toUpperCase()} WINS!`;
 
     addChild(game_over_container, game_over_heading);
 
@@ -1079,17 +997,10 @@ function createGameOverScreen(winningTeam, causeMessage) {
     addChild(game_over_container, game_over_summary);
 
     // Create game over new game container
-    const game_over_new_game_container = newElem(
-        "div",
-        "game-over-new-game-container"
-    );
+    const game_over_new_game_container = newElem("div", "game-over-new-game-container");
 
     // Create game over new game button
-    const game_over_new_game_button = newElem(
-        "button",
-        null,
-        "game-over-new-game-button"
-    );
+    const game_over_new_game_button = newElem("button", null, "game-over-new-game-button");
     game_over_new_game_button.textContent = "New Game";
     game_over_new_game_button.addEventListener("click", () => {
         client.emit("next-game");
@@ -1099,17 +1010,10 @@ function createGameOverScreen(winningTeam, causeMessage) {
     addChild(game_over_container, game_over_new_game_container);
 
     // Create game over new game container
-    const game_over_change_teams_container = newElem(
-        "div",
-        "game-over-change-teams-container"
-    );
+    const game_over_change_teams_container = newElem("div", "game-over-change-teams-container");
 
     // Create game over home button
-    const game_over_change_teams_button = newElem(
-        "button",
-        null,
-        "game-over-change-teams-button"
-    );
+    const game_over_change_teams_button = newElem("button", null, "game-over-change-teams-button");
     game_over_change_teams_button.textContent = "Change Teams";
     game_over_change_teams_button.addEventListener("click", () => {
         client.emit("change-teams");
@@ -1122,11 +1026,7 @@ function createGameOverScreen(winningTeam, causeMessage) {
     const game_over_home_container = newElem("div", "game-over-home-container");
 
     // Create game over home button
-    const game_over_home_button = newElem(
-        "button",
-        null,
-        "game-over-home-button"
-    );
+    const game_over_home_button = newElem("button", null, "game-over-home-button");
     game_over_home_button.textContent = "Home";
     game_over_home_button.addEventListener("click", () => {
         client.emit("leave-game");
