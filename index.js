@@ -119,6 +119,7 @@ io.on("connection", (client) => {
     client.on("create-room", (...args) => createRoom(client, ...args));
     client.on("join-room", (roomCode, nickname, isHost = false) => joinRoom(client, roomCode, nickname));
     client.on("join-team", (...args) => joinTeam(client, ...args));
+    client.on("leave-team", () => leaveTeam(client));
     client.on("new-game", () => newGame(client));
 
     // game screen
@@ -241,7 +242,7 @@ function joinRoom(client, roomCode, nickname, isHost = false) {
     if (isHost) room.host = client.id;
 
     // Announce to new player that they have joined
-    client.emit("joined-room", roomCode, room.status, isHost);
+    client.emit("joined-room", roomCode, isHost);
     // Tell members about the new player
     client.emit("update-players", getPlayerNames(roomCode, RED), getPlayerNames(roomCode, BLUE), room.status);
 }
@@ -285,7 +286,15 @@ function leaveRoom(client) {
     }
 
     // Tell players this player left the room
-    io.to(roomCode).emit("update-players", getPlayerNames(roomCode, RED), getPlayerNames(roomCode, BLUE), room.status);
+    getPlayerIds(roomCode).forEach((playerId) => {
+        io.to(playerId).emit(
+            "update-players",
+            getPlayerNames(roomCode, RED),
+            getPlayerNames(roomCode, BLUE),
+            room.status,
+            playerId == null ? null : players[playerId].role
+        );
+    });
 }
 
 //TODO - OPTIMIZE
@@ -321,7 +330,42 @@ function joinTeam(client, team) {
     }
 
     // Tell players about the new player that joined
-    io.to(roomCode).emit("update-players", getPlayerNames(roomCode, RED), getPlayerNames(roomCode, BLUE), room.status);
+    getPlayerIds(roomCode).forEach((playerId) => {
+        io.to(playerId).emit(
+            "update-players",
+            getPlayerNames(roomCode, RED),
+            getPlayerNames(roomCode, BLUE),
+            room.status,
+            playerId == null ? null : players[playerId].role
+        );
+    });
+}
+
+function leaveTeam(client) {
+    const roomCode = getRoomCode(client);
+    const room = getRoom(roomCode);
+    const player = getPlayer(client);
+
+    if (player.team == null) return;
+    if (player.role == null) return;
+
+    room.players[player.team][player.role] = null;
+
+    player.team = null;
+    player.role = null;
+
+    client.emit("left-team");
+
+    // Tell players about the player that left
+    getPlayerIds(roomCode).forEach((playerId) => {
+        io.to(playerId).emit(
+            "update-players",
+            getPlayerNames(roomCode, RED),
+            getPlayerNames(roomCode, BLUE),
+            room.status,
+            playerId == null ? null : players[playerId].role
+        );
+    });
 }
 
 function getEmptySpaceOnTeam(roomCode, playerTeam) {
@@ -567,16 +611,15 @@ function changeTeams(client) {
     const room = getRoom(roomCode);
     if (room == null) return;
 
-    const playerIds = getPlayerIds(roomCode);
-
     room.status = "lobby";
-    playerIds.forEach((playerId) => {
-        io.to(playerId).emit("joined-room", roomCode, room.status, room.host == playerId);
+    getPlayerIds(roomCode).forEach((playerId) => {
+        io.to(playerId).emit("joined-room", roomCode, room.host == playerId);
         io.to(playerId).emit(
             "update-players",
             getPlayerNames(roomCode, RED),
             getPlayerNames(roomCode, BLUE),
-            room.status
+            room.status,
+            playerId == null ? null : players[playerId].role
         );
     });
 }
