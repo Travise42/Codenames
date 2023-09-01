@@ -32,8 +32,8 @@ const ASSASSIN = 4;
 
 const DEFAULT = INNOCENT;
 
-const OPPERATIVE = 0;
-const SPYMASTER = 1;
+let OPPERATIVE = 0;
+let SPYMASTER = 1;
 
 const COLUMNS = ["a", "b", "c", "d", "e"];
 
@@ -117,7 +117,7 @@ const players = {};
 io.on("connection", (client) => {
     // Home screen
     client.on("create-room", (...args) => createRoom(client, ...args));
-    client.on("join-room", (...args) => joinRoom(client, ...args));
+    client.on("join-room", (roomCode, nickname, isHost = false) => joinRoom(client, roomCode, nickname));
     client.on("join-team", (...args) => joinTeam(client, ...args));
     client.on("new-game", () => newGame(client));
 
@@ -127,7 +127,6 @@ io.on("connection", (client) => {
     client.on("give-clue", (...args) => giveClue(client, ...args));
 
     // game over screen
-    client.on("ping-change-teams", () => pingChangeTeams(client));
     client.on("change-teams", () => changeTeams(client));
     client.on("next-game", () => nextGame(client));
     client.on("leave-game", () => leaveGame(client));
@@ -243,11 +242,8 @@ function joinRoom(client, roomCode, nickname, isHost = false) {
 
     // Announce to new player that they have joined
     client.emit("joined-room", roomCode, room.status, isHost);
-    client.emit(
-        "update-players",
-        getPlayerNames(roomCode, RED, room.status),
-        getPlayerNames(roomCode, BLUE, room.status)
-    );
+    // Tell members about the new player
+    client.emit("update-players", getPlayerNames(roomCode, RED), getPlayerNames(roomCode, BLUE), room.status);
 }
 
 //? uncachePlayer must NOT be called before leaveRoom
@@ -260,25 +256,36 @@ function leaveRoom(client) {
     if (roomCode == null) return;
 
     const room = rooms[roomCode];
-    const playerIds = room.players;
 
+    const redMembers = room.players[RED];
+    const blueMembers = room.players[BLUE];
+
+    const player = getPlayer(client);
+
+    // Create new host if old host left
+    if (client.id == room.host) {
+        room.host = getJoinedPlayerIds(roomCode).filter((playerId) => playerId != client.id)[0];
+    }
+    console.log(room.host);
+
+    // Player hasn't been cached in the room yet, no removing needed
+    if (player.team == null) return;
+
+    // Tell members that player left
+    io.to(roomCode).emit("player-left", player.team, player.role, room.status, room.host);
+
+    // Remove player from room
+    room.players[player.team][player.role] = null;
     client.leave(roomCode);
 
-    io.to(roomCode).emit("player-left", getPlayer(client).role, room.status);
-    rooms[roomCode].players[getPlayer(client).team][getPlayer(client).role] = null;
-
-    // If anyone is left in the room...
-    if (playerIds.length) {
-        // Tell players this player left the room
-        io.to(roomCode).emit(
-            "update-players",
-            getPlayerNames(roomCode, RED, room.status),
-            getPlayerNames(roomCode, BLUE, room.status)
-        );
+    // If no one is left in the room...
+    if (redMembers[0] == null && redMembers[1] == null && blueMembers[0] == null && blueMembers[1] == null) {
+        delete room;
         return;
     }
 
-    delete room;
+    // Tell players this player left the room
+    io.to(roomCode).emit("update-players", getPlayerNames(roomCode, RED), getPlayerNames(roomCode, BLUE), room.status);
 }
 
 //TODO - OPTIMIZE
@@ -286,26 +293,33 @@ function leaveRoom(client) {
 function joinTeam(client, team) {
     const roomCode = getRoomCode(client);
     const room = getRoom(roomCode);
-    const roomPlayers = room.players;
-    const roomStatus = room.status;
     const player = getPlayer(client);
 
-    if (player.team != null && player.role != null) roomPlayers[player.team][player.role] = null;
+    if (player.team != null && player.role != null) room.players[player.team][player.role] = null;
 
     // Set player team
     player.team = team;
 
     // Add player to room
-    roomPlayers[player.team].push(client.id);
+    const openSpace = +getEmptySpaceOnTeam(roomCode, player.team);
 
-    if (roomStatus != "lobby")
+    room.players[player.team][openSpace] = player.id;
+    player.role = openSpace;
+
+    if (room.status != "lobby") {
         client.emit("new-game", getPlayerNames(roomCode, RED), getPlayerNames(roomCode, BLUE), player.role);
-    //TODO COME BACK
-    //client.emit('new-round', );
-    //newRound(cards, isSpymaster, turn, newScores, newFirst)
+        client.emit("new-round", Object.values(room.cards), player.role, room.turn, room.scores);
+    }
 
     // Tell players about the new player that joined
     io.to(roomCode).emit("update-players", getPlayerNames(roomCode, RED), getPlayerNames(roomCode, BLUE), room.status);
+}
+
+function getEmptySpaceOnTeam(roomCode, playerTeam) {
+    const room = getRoom(roomCode);
+    if (room.players[playerTeam][0] == null) return 0;
+    if (room.players[playerTeam][1] == null) return 1;
+    return null;
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -323,14 +337,9 @@ function newGame(client) {
     // Only allow host to start the game
     if (room.host != client.id) return;
 
-    room.players.forEach((team) => {
-        team.forEach((playerId, isSpymaster) => {
-            io.to(playerId).emit(
-                "new-game",
-                getPlayerNames(roomCode, RED),
-                getPlayerNames(roomCode, BLUE),
-                isSpymaster
-            );
+    Object.values(room.players).forEach((teamMembers) => {
+        teamMembers.forEach((playerId, role) => {
+            io.to(playerId).emit("new-game", getPlayerNames(roomCode, RED), getPlayerNames(roomCode, BLUE), role);
         });
     });
 
@@ -370,8 +379,7 @@ function newRound(client) {
     };
 
     // Change who is code master
-    //? [[0, 1], [0, 1]] => [[1, 0], [1, 0]]
-    room.players.map((team) => team.reverse());
+    [SPYMASTER, SPYMASTER] = [SPYMASTER, SPYMASTER];
 
     // Create new scores
     room.scores = { 1: 8, 2: 8 };
@@ -381,8 +389,8 @@ function newRound(client) {
     let cardIds = Array(25).fill(DEFAULT);
 
     // Add teams cards and assassin card
-    cardIds = setCards(cardIds, 8, room.scores[RED]);
-    cardIds = setCards(cardIds, 8, room.scores[BLUE]);
+    cardIds = setCards(cardIds, room.scores[RED], RED);
+    cardIds = setCards(cardIds, room.scores[BLUE], BLUE);
     cardIds = setCards(cardIds, 1, ASSASSIN);
 
     // Create layout texts
@@ -400,15 +408,15 @@ function newRound(client) {
     });
 
     // Broadcast new layout
-    room.players.forEach((teamMembers) => {
-        teamMembers.forEach((playerId, isSpymaster) => {
+    Object.values(room.players).forEach((teamMembers) => {
+        teamMembers.forEach((playerId, role) => {
             // Make a copy of 'cards'
             const alteredCards = Object.values(cards).map((card) => ({ ...card }));
 
             // Remove card identification if player isn't spymaster
-            if (!isSpymaster) alteredCards.forEach((card) => (card.id = INNOCENT));
+            if (role == OPPERATIVE) alteredCards.forEach((card) => (card.id = INNOCENT));
 
-            io.to(playerId).emit("new-round", alteredCards, isSpymaster, room.turn, room.scores, room.startingTeam);
+            io.to(playerId).emit("new-round", alteredCards, role, room.turn, room.scores);
         });
     });
 }
@@ -437,9 +445,9 @@ function guessCard(client, pos) {
     // Decrease player's guesses left
     room.guessesLeft -= 1;
     // Tell members to cover the chosen card
-    io.to(roomCode).emit("cover-card", pos, card.id);
+    io.to(roomCode).emit("cover-card", pos, card.id, room.scores);
     // Tell player that they made a valid guess
-    client.emit("made-guess", room.scores, room.guessesLeft);
+    client.emit("made-guess", room.guessesLeft);
 
     // Handle game over
     handleGameOver(client, card);
@@ -540,22 +548,23 @@ function nextTurn(client, amount = 0) {
 function changeTeams(client) {
     const roomCode = getRoomCode(client);
     const room = getRoom(roomCode);
-    const playerIds = room.players;
+    const playerIds = getPlayerIds(roomCode);
 
-    playerIds.forEach((teamMembers) => {
-        teamMembers.forEach((playerId) => {
-            io.to(playerId).emit("joined-room", roomCode, room.status);
-            io.to(playerId).emit(
-                "update-players",
-                getPlayerNames(roomCode, RED, room.status),
-                getPlayerNames(roomCode, BLUE, room.status)
-            );
-        });
+    room.status = "lobby";
+    playerIds.forEach((playerId) => {
+        io.to(playerId).emit("joined-room", roomCode, room.status, room.host == playerId);
+        io.to(playerId).emit(
+            "update-players",
+            getPlayerNames(roomCode, RED),
+            getPlayerNames(roomCode, BLUE),
+            room.status
+        );
     });
 }
 
 function nextGame(client) {
     newRound(client);
+    getRoom(getRoomCode(client)).status = "game";
 }
 
 function leaveGame(client) {
@@ -605,16 +614,36 @@ function getRoom(roomCode) {
 }
 
 function getPlayerNames(roomCode, team) {
-    return getRoom(roomCode).players[team].map((playerId) => (playerId == null ? null : players[playerId].name));
+    const room = getRoom(roomCode);
+
+    return room.players[team].map(getPlayerName);
+}
+
+function getPlayerName(playerId) {
+    return playerId == null ? null : players[playerId].name;
 }
 
 function getPlayerIds(roomCode) {
     const room = getRoom(roomCode);
     const playerIds = [];
 
-    room.players.forEach((teamMembers) => {
+    Object.values(room.players).forEach((teamMembers) => {
         //TODO - TRY WITHOUT PARAMETERS
         teamMembers.forEach((playerId) => playerIds.push(playerId));
+    });
+
+    return playerIds;
+}
+
+function getJoinedPlayerIds(roomCode) {
+    const room = getRoom(roomCode);
+    const playerIds = [];
+
+    Object.values(room.players).forEach((teamMembers) => {
+        teamMembers.forEach((playerId) => {
+            if (playerId == null) return;
+            playerIds.push(playerId);
+        });
     });
 
     return playerIds;
@@ -632,7 +661,7 @@ function isActive(client) {
 function getActivePlayerId(roomCode) {
     const room = getRoom(roomCode);
 
-    return room.players[room.turn.team][room.turn.isSpymaster];
+    return room.players[room.turn.team][room.turn.role];
 }
 
 // ----------------------------------------------------------------------------------------------------

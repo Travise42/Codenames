@@ -381,7 +381,7 @@ button {
 
 .topleft-nametag-container, .bottomleft-nametag-container, .topright-nametag-container, .bottomright-nametag-container {
     position: absolute;
-    width: 10rem;
+    width: 12rem;
     height: 3rem;
     border-radius: 0.5rem;
     background: var(--color-primary);
@@ -433,6 +433,12 @@ button {
     top: 50%;
     transform: translate(0, -50%);
     color: inherit;
+
+    &.disconnected {
+        font-style: italic;
+        letter-spacing: -2px;
+        opacity: 0.8;
+    }
 }
 
 .turn-indicator-container {

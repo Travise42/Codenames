@@ -54,8 +54,13 @@ const BOTTOM_LEFT = 1;
 const TOP_RIGHT = 2;
 const BOTTOM_RIGHT = 3;
 
-const OPPERATIVE = 0;
-const SPYMASTER = 1;
+const LEFT = 1;
+const RIGHT = 2;
+const TOP = 0;
+const BOTTOM = 1;
+
+let OPPERATIVE = 0;
+let SPYMASTER = 1;
 
 const COLUMNS = ["a", "b", "c", "d", "e"];
 
@@ -67,7 +72,6 @@ const user = {
     roomCode: undefined,
     isHost: undefined,
     team: undefined,
-    isSpymaster: undefined,
     role: undefined,
     guesses: undefined,
 };
@@ -129,7 +133,7 @@ function createNameScreen() {
     // create start button
     const name_button_element = newElem("button", null, "name-button");
     name_button_element.textContent = "Play";
-    name_button_element.addEventListener("click", () => submitName(name_input_element.value));
+    name_button_element.addEventListener("click", () => submitName(name_input_element.value.toUpperCase()));
 
     addChild(name_container, name_button_element);
 
@@ -175,7 +179,7 @@ function createHomeScreen() {
     // Create join room button
     const join_room_button = newElem("button", null, "join-room-button");
     join_room_button.textContent = "Join Room";
-    join_room_button.addEventListener("click", () => client.emit("join-room", join_room_input.value, user.name));
+    join_room_button.addEventListener("click", () => client.emit("join-room", join_room_input.value, user.name, false));
 
     addChild(join_room_contianer, join_room_button);
 
@@ -208,9 +212,10 @@ function removeHomeScreen() {
 
 //? from server
 //? transition | Home Screen => Lobby Screen
-function joinRoom(roomId, roomStatus, isHost = null) {
+function joinRoom(roomCode, roomStatus, isHost = null) {
     // Set room id and host value
-    user.roomCode = roomId;
+    user.roomCode = roomCode;
+    console.log(isHost);
     if (isHost != null) user.isHost = isHost;
 
     // Remove potential end screen
@@ -299,7 +304,7 @@ function createLobbyScreen(roomStatus) {
     addChild(main_container, blue_players_container);
 
     // Stop if user is not host
-    if (!user.isHost || roomStatus != "lobby") return;
+    if (!user.isHost) return;
 
     // create play button if user is host
     const play_button_contianer = newElem("div", "play-button-container");
@@ -316,24 +321,34 @@ function createLobbyScreen(roomStatus) {
 }
 
 function removeLobbyScreen() {
-    document.querySelector(".red-players-container").remove();
-    document.querySelector(".blue-players-container").remove();
+    const red_players_container = document.querySelector(".red-players-container");
+    const blue_players_container = document.querySelector(".blue-players-container");
+
+    if (red_players_container == null) return;
+    if (blue_players_container == null) return;
+
+    red_players_container.remove();
+    blue_players_container.remove();
 
     if (!user.isHost) return;
 
     document.querySelector(".play-button-container").remove();
 }
 
-function playerLeft(playerRole, roomStatus) {
-    if (roomStatus != "game") return;
+function playerLeft(playerTeam, playerRole, roomStatus, newHost) {
+    if (client.id == newHost) {
+        user.isHost = true;
+        console.log("im host");
+    }
 
-    const nametags = {};
-    nametags[TOP_LEFT] = document.querySelector(".topleft-nametag-container");
-    nametags[BOTTOM_LEFT] = document.querySelector(".bottomleft-nametag-container");
-    nametags[TOP_RIGHT] = document.querySelector(".topright-nametag-container");
-    nametags[BOTTOM_RIGHT] = document.querySelector(".bottomright-nametag-container");
+    //// if (roomStatus != "game") return;
 
-    nametags[(playerRole[0] == BLUE) * 2 + playerRole[1]].textContent = "DISCONNECTED";
+    //// const nametags = {
+    ////     1: [document.querySelector(".topleft-nametag-label"), document.querySelector(".bottomleft-nametag-label")],
+    ////     2: [document.querySelector(".topright-nametag-label"), document.querySelector(".bottomright-nametag-label")],
+    //// };
+
+    //// nametags[playerTeam][playerRole].textContent = "DISCONNECTED";
 }
 
 //? from server
@@ -343,6 +358,29 @@ function updatePlayers(redTeam, blueTeam, roomStatus) {
     if (main_container.classList.contains("playing-board")) {
         // Get game over new game button
         const game_over_new_game_button = document.getElementById("game-over-new-game-button");
+
+        if (roomStatus == "game") {
+            const nametags = {
+                1: [
+                    document.querySelector(".topleft-nametag-label"),
+                    document.querySelector(".bottomleft-nametag-label"),
+                ],
+                2: [
+                    document.querySelector(".topright-nametag-label"),
+                    document.querySelector(".bottomright-nametag-label"),
+                ],
+            };
+
+            caseNull = (label) => (label == null ? "--DISCONNECTED--" : label);
+
+            nametags[LEFT][TOP].textContent = caseNull(redTeam[TOP]);
+            nametags[LEFT][BOTTOM].textContent = caseNull(redTeam[BOTTOM]);
+
+            nametags[RIGHT][TOP].textContent = caseNull(blueTeam[TOP]);
+            nametags[RIGHT][BOTTOM].textContent = caseNull(blueTeam[BOTTOM]);
+
+            nametags[user.team][user.role].textContent += " (YOU)";
+        }
 
         if (game_over_new_game_button == null) return;
         if (redTeam.length == 2 && blueTeam.length == 2) return;
@@ -357,8 +395,10 @@ function updatePlayers(redTeam, blueTeam, roomStatus) {
     const red_players_list = document.getElementById("red-players-list");
     const blue_players_list = document.getElementById("blue-players-list");
 
-    join_red_button.disabled = user.team == RED || (roomStatus == "game" && redTeam.length >= 2);
-    join_blue_button.disabled = user.team == BLUE || (roomStatus == "game" && blueTeam.length >= 2);
+    join_red_button.disabled =
+        (roomStatus == "lobby" && user.team == RED) || (roomStatus == "game" && !redTeam.includes(null));
+    join_blue_button.disabled =
+        (roomStatus == "lobby" && user.team == BLUE) || (roomStatus == "game" && !blueTeam.includes(null));
 
     document.querySelectorAll(".room-player").forEach((li) => li.remove());
 
@@ -389,10 +429,10 @@ function updatePlayers(redTeam, blueTeam, roomStatus) {
 
 //? from server
 //? transition | Lobby Screen => Game Screen
-function startGame(playerNames, isSpymaster) {
+function startGame(redMembers, blueMembers, role) {
     removeLobbyScreen();
-    setSpymaster(isSpymaster);
-    definePlayerRoles(playerNames);
+    setRole(role);
+    definePlayerRoles(redMembers, blueMembers);
     createGameScreen();
     createCards();
 }
@@ -430,8 +470,8 @@ function createGameScreen() {
 
     // Create topleft nametag label
     const topleft_nametag_label = newElem("h3", "topleft-nametag-label");
-    topleft_nametag_label.textContent = players[TOP_LEFT].toUpperCase();
-    if (user.role == [RED, OPPERATIVE]) topleft_nametag_label.textContent += " (YOU)";
+    topleft_nametag_label.textContent = players[LEFT][TOP].toUpperCase();
+    if (user.team == RED && user.role == OPPERATIVE) topleft_nametag_label.textContent += " (YOU)";
 
     addChild(topleft_nametag_container, topleft_nametag_label);
 
@@ -444,8 +484,8 @@ function createGameScreen() {
 
     // Create bottomleft nametag label
     const bottomleft_nametag_label = newElem("h3", "bottomleft-nametag-label");
-    bottomleft_nametag_label.textContent = players[BOTTOM_LEFT].toUpperCase();
-    if (user.role == [RED, SPYMASTER]) bottomleft_nametag_label.textContent += " (YOU)";
+    bottomleft_nametag_label.textContent = players[LEFT][BOTTOM].toUpperCase();
+    if (user.team == RED && user.role == SPYMASTER) bottomleft_nametag_label.textContent += " (YOU)";
 
     addChild(bottomleft_nametag_container, bottomleft_nametag_label);
 
@@ -458,8 +498,8 @@ function createGameScreen() {
 
     // Create topright nametag label
     const topright_nametag_label = newElem("h3", "topright-nametag-label");
-    topright_nametag_label.textContent = players[TOP_RIGHT].toUpperCase();
-    if (user.role == [BLUE, OPPERATIVE]) topright_nametag_label.textContent += " (YOU)";
+    topright_nametag_label.textContent = players[RIGHT][TOP].toUpperCase();
+    if (user.team == BLUE && user.role == OPPERATIVE) topright_nametag_label.textContent += " (YOU)";
 
     addChild(topright_nametag_container, topright_nametag_label);
 
@@ -472,8 +512,8 @@ function createGameScreen() {
 
     // Create bottomright nametag label
     const bottomright_nametag_label = newElem("h3", "bottomright-nametag-label");
-    bottomright_nametag_label.textContent = players[BOTTOM_RIGHT].toUpperCase();
-    if (user.role == [BLUE, SPYMASTER]) bottomright_nametag_label.textContent += " (YOU)";
+    bottomright_nametag_label.textContent = players[RIGHT][BOTTOM].toUpperCase();
+    if (user.team == BLUE && user.role == SPYMASTER) bottomright_nametag_label.textContent += " (YOU)";
 
     addChild(bottomright_nametag_container, bottomright_nametag_label);
 
@@ -559,8 +599,9 @@ function removeGameScreen() {
     });
 }
 
-function definePlayerRoles(playerNames) {
-    players = playerNames;
+function definePlayerRoles(redMembers, blueMembers) {
+    players[RED] = redMembers;
+    players[BLUE] = blueMembers;
 }
 
 function createCards() {
@@ -629,16 +670,15 @@ function gridCard(card, pos) {
 
 //? from server
 //? event | Empty Game Screen => Active Game Screen
-function newRound(cards, isSpymaster, turn, newScores, newFirst) {
-    first = newFirst;
+function newRound(cards, role, turn, newScores) {
     removeGameOverScreen();
-    setSpymaster(isSpymaster);
+    setRole(role);
     clearLog();
     clearCovers();
     editCards(cards);
     flipCards();
     nextTurn(turn, undefined);
-    updateScoring(newScores);
+    updateScore(newScores);
     setTimeout(() => unflipCards(cards), 800);
 }
 
@@ -710,24 +750,29 @@ function guessCard(pos) {
 }
 
 //? from server
-function coverCard(pos, id) {
-    const card_pos = document.getElementById(pos);
-    const card = card_pos.firstChild;
-    const inner = card.firstChild;
+function coverCard(cardPos, cardId, newScores) {
+    updateScore(newScores);
+
+    const card_pos_element = document.getElementById(cardPos);
+    const card_element = card_pos_element.firstChild;
+    const inner_element = card_element.firstChild;
 
     // create card cover
-    const card_cover = newElem("div", "card-cover");
-    addClass(card_cover, "new");
+    const card_cover_element = newElem("div", "card-cover");
+    addClass(card_cover_element, "new");
     const card_cover_img = newElem("img", "card-img");
-    addPath(card_cover_img, CARDIDS[id].cover_paths[parseInt(pos.charAt(1)) % CARDIDS[id].cover_paths.length]);
-    addChild(card_cover, card_cover_img);
+    addPath(
+        card_cover_img,
+        CARDIDS[cardId].cover_paths[parseInt(cardPos.charAt(1)) % CARDIDS[cardId].cover_paths.length]
+    );
+    addChild(card_cover_element, card_cover_img);
 
     // Add card cover to screen
-    addChild(inner, card_cover);
+    addChild(inner_element, card_cover_element);
 
-    addClass(card, "covered");
+    addClass(card_element, "covered");
 
-    setTimeout(() => removeClass(card_cover, "new"), 10);
+    setTimeout(() => removeClass(card_cover_element, "new"), 10);
 }
 
 function clearCovers() {
@@ -742,7 +787,7 @@ function clearCovers() {
     });
 }
 
-function updateScoring(newScores) {
+function updateScore(newScores) {
     scores = newScores;
 
     const red_score_heading = document.querySelector(".red-score-heading");
@@ -782,13 +827,11 @@ function giveClue() {
 }
 
 //? from server
-function madeGuess(newScores, guessesLeft = user.guesses) {
-    updateScoring(newScores);
-
-    // Get turn indicator
-    const turn_indicator = document.querySelector(".turn-indicator");
-
-    turn_indicator.textContent = "Your Turn... " + (user.guesses - guessesLeft) + "/" + user.guesses;
+function madeGuess(guessesLeft = user.guesses) {
+    // Update turn indicator
+    document.querySelector(".turn-indicator").textContent = `Your Turn... ${user.guesses - guessesLeft}/${
+        user.guesses
+    }`;
 
     // Check if pass button shoud
     if (guessesLeft <= 0) return;
@@ -826,14 +869,14 @@ function passGuess() {
 }
 
 //? from server
-function reciveClue(clue, amount, nickname, team) {
+function reciveClue(clue, amount, senderName, senderTeam) {
     // Get game log
     const game_log = document.getElementById("game-log");
 
     // Create new list element
     const log_message = newElem("li", "log-message");
-    addClass(log_message, CARDIDS[team].string);
-    log_message.textContent = `${nickname}: '${clue}' for ${amount}`;
+    addClass(log_message, CARDIDS[senderTeam].string);
+    log_message.textContent = `${senderName}: '${clue}' for ${amount}`;
     addChild(game_log, log_message);
 
     game_log.scrollTop = game_log.scrollHeight;
@@ -848,16 +891,23 @@ function clearLog() {
 //? from server
 function nextTurn(newTurn, amount = 0) {
     turn = newTurn;
-    if (turn == user.role) user.guesses = amount;
-    if (turn == user.role) addPlayingElements();
-    else removePlayingElements();
+
+    const isPlayersTurn = turn.team == user.team && turn.role == user.role;
+
+    if (isPlayersTurn) {
+        user.guesses = amount;
+        addPlayingElements();
+    } else {
+        removePlayingElements();
+    }
+
     editTurnIndicator();
 }
 
 function addPlayingElements() {
     removePlayingElements();
 
-    if (user.isSpymaster) addClueInput();
+    if (user.role) addClueInput();
     else document.querySelectorAll(".card").forEach((card_element) => addClass(card_element, "clickable"));
 }
 
@@ -872,75 +922,81 @@ function editTurnIndicator() {
 
     updateHighlightedNametags();
 
+    // Player's team's turn
     if (user.team == turn.team) {
-        if (user.isSpymaster == turn.isSpymaster) {
-            if (!user.isSpymaster) {
-                // Your turn (opperative)
-                turn_indicator.textContent = "Your Turn... 0/" + user.guesses;
-                return;
+        // Player's turn
+        if (user.role == turn.role) {
+            // Player is spymaster
+            if (turn.role == SPYMASTER) {
+                turn_indicator.textContent = "Your Turn...";
             }
-            // Your turn (spymaster)
-            turn_indicator.textContent = "Your Turn...";
-            return;
+
+            // Player is opperative
+            else if (turn.role == OPPERATIVE) {
+                turn_indicator.textContent = `Your Turn... 0/${user.guesses}`;
+            }
         }
-        if (!user.isSpymaster) {
-            // Your teamate's turn (spymaster)
-            turn_indicator.textContent = "Your Teamate is Thinking...";
-            return;
+
+        // Player's teamate's turn
+        else if (user.role != turn.role) {
+            // Player's teamate is spymaster
+            if (turn.role == SPYMASTER) {
+                turn_indicator.textContent = "Your Teamate is Thinking...";
+            }
+
+            // Player's teamate's is opperative
+            else if (turn.role == OPPERATIVE) {
+                turn_indicator.textContent = "Your Teamate is Guessing...";
+            }
         }
-        // Your teamate's turn (opperative)
-        turn_indicator.textContent = "Your Teamate is Guessing...";
-        return;
     }
 
-    if (isSpymaster) {
-        // The opponent spymaster's turn
-        turn_indicator.textContent = "The Opponent Spymaster is Thinking...";
-        return;
-    }
+    // Player's opponents's turn
+    else if (user.team != turn.team) {
+        // The opponent is opperative
+        if (turn.role == SPYMASTER) {
+            turn_indicator.textContent = "The Opponent Opperative is Guessing...";
+        }
 
-    // The opponent opperative's turn
-    turn_indicator.textContent = "The Opponent Opperative is Guessing...";
+        // The opponent is spymaster
+        else if (turn.role == OPPERATIVE) {
+            turn_indicator.textContent = "The Opponent Spymaster is Thinking...";
+        }
+    }
 }
 
 function updateHighlightedNametags() {
-    const nametags = [
-        document.querySelector(".topleft-nametag-container"),
-        document.querySelector(".bottomleft-nametag-container"),
-        document.querySelector(".topright-nametag-container"),
-        document.querySelector(".bottomright-nametag-container"),
-    ];
+    const nametags = {
+        1: [
+            document.querySelector(".topleft-nametag-container"),
+            document.querySelector(".bottomleft-nametag-container"),
+        ],
+        2: [
+            document.querySelector(".topright-nametag-container"),
+            document.querySelector(".bottomright-nametag-container"),
+        ],
+    };
 
     // Remove highlight from everyone
-    nametags.forEach((nametag) => {
-        removeClass(nametag, "active");
-    });
+    removeClass(nametags[RED][OPPERATIVE], "active");
+    removeClass(nametags[RED][SPYMASTER], "active");
+    removeClass(nametags[BLUE][OPPERATIVE], "active");
+    removeClass(nametags[BLUE][SPYMASTER], "active");
 
     // Add highlight to the active player
-    addClass(nametags[turn], "active");
+    addClass(nametags[turn.team][turn.role], "active");
 }
 
 // ----------------------------------------------------------------------------------------------------
 // Player Functions
 
-function setSpymaster(value) {
-    user.isSpymaster = value;
-    updateRole();
+function setRole(newRole) {
+    user.role = newRole;
     rotateRoles();
 }
 
-function updateRole() {
-    user.role = (user.team == RED ? 0 : 2) + !user.isSpymaster;
-}
-
 function rotateRoles() {
-    [SPYMASTER, CODEMASTER] = [CODEMASTER, SPYMASTER];
-}
-
-function getRoleAttributes(role) {
-    const team = Math.floor(role / 2) ? BLUE : RED;
-    const isSpymaster = !(role % 2);
-    return [team, isSpymaster];
+    [SPYMASTER, SPYMASTER] = [SPYMASTER, SPYMASTER];
 }
 
 // ----------------------------------------------------------------------------------------------------
