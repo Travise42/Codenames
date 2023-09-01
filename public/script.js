@@ -656,6 +656,13 @@ function createGameScreen() {
 
     // Create red score container
     const red_score_container = newElem("div", "red-score-container");
+    red_score_container.addEventListener("click", () => {
+        if (red_score_container.classList.contains("hidden")) {
+            removeClass(red_score_container, "hidden");
+        } else {
+            addClass(red_score_container, "hidden");
+        }
+    });
 
     // Create red score image
     const red_score_image = newElem("img", "red-score-image");
@@ -673,6 +680,13 @@ function createGameScreen() {
 
     // Create blue score container
     const blue_score_container = newElem("div", "blue-score-container");
+    blue_score_container.addEventListener("click", () => {
+        if (blue_score_container.classList.contains("hidden")) {
+            removeClass(blue_score_container, "hidden");
+        } else {
+            addClass(blue_score_container, "hidden");
+        }
+    });
 
     // Create blue score image
     const blue_score_image = newElem("img", "blue-score-image");
@@ -698,10 +712,10 @@ function createGameScreen() {
     game_log_heading.addEventListener("click", () => {
         if (game_log_container.classList.contains("hidden")) {
             removeClass(game_log_container, "hidden");
-            game_log_heading.textContent = "Game log...";
+            game_log_heading.textContent = "Game log";
         } else {
             addClass(game_log_container, "hidden");
-            game_log_heading.textContent = "Game log";
+            game_log_heading.textContent = "Game log...";
         }
     });
 
@@ -962,9 +976,11 @@ function giveClue() {
 //? from server
 function madeGuess(guessesLeft = user.guesses) {
     // Update turn indicator
-    document.querySelector(".turn-indicator").textContent = `Your Turn... ${user.guesses - guessesLeft}/${
-        user.guesses
-    }`;
+    const turnIndicator = document.querySelector(".turn-indicator");
+
+    if (turnIndicator != null) {
+        turnIndicator.textContent = `Your Turn... ${user.guesses - guessesLeft}/${user.guesses}`;
+    }
 
     // Check if pass button shoud
     if (guessesLeft <= 0) return;

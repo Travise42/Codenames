@@ -27,11 +27,13 @@ body {
 /* <<< Standard for headings >>> */
 
 h1 {
+    position: relative;
     font-family: Verdana, Geneva, Tahoma, sans-serif;
     font-size: 2rem;
     text-align: center;
-    width: 20%;
-    margin: 1rem 40%;
+    width: max-content;
+    left: 50%;
+    transform: translateX(-50%);
     color: var(--color-contrast);
 }
 h2, h3 {
@@ -252,7 +254,7 @@ button {
         border-radius: 2rem;
         border: 1px solid black;
         position: relative;
-        margin-top: 5rem;
+        margin-top: 8rem;
         font-family: Verdana, Geneva, Tahoma, sans-serif;
         border: 5px solid var(--color-contrast);
         background: var(--color-primary);
@@ -261,8 +263,8 @@ button {
 
 .card-container {
     position: relative;
-    width: calc( min( 85vh, var(--card-width) * 16 / 15 * 5 ) );
-    height: calc( min( min( 57vh, 61vw ), var(--card-height) * 16 / 15 * 5 ) );
+    width: calc( min( 82vh, var(--card-width) * 16 / 15 * 5 ) );
+    height: calc( min( min( 54vh, 61vw ), var(--card-height) * 16 / 15 * 5 ) );
     font-size: calc( min( min( 1.6vh, 1.8vw ), var(--card-height) / 6 ) );
     display: grid;
     margin: 1rem;
@@ -434,6 +436,7 @@ button {
     }
     &.active {
         color: var(--color-active);
+        text-shadow: 0 0 0.8rem var(--color-active), 0 0 0.5rem var(--color-active);
     }
 }
 
@@ -475,7 +478,7 @@ button {
 .turn-indicator-container {
     position: absolute;
     left: 50%;
-    top: -4rem;
+    top: -7.5rem;
     width: 15rem;
     height: 3rem;
     text-align: center;
@@ -504,14 +507,26 @@ button {
     top: 0.5rem;
     font-family: Verdana, Geneva, Tahoma, sans-serif;
     font-size: 2rem;
+
+    &.hidden .red-score-heading, &.hidden .blue-score-heading {
+        visibility: hidden;
+    }
 }
 
 .red-score-container {
     left: 0.5rem;
+
+    &.hidden {
+        left: -8rem;
+    }
 }
 
 .blue-score-container {
     right: 0.5rem;
+
+    &.hidden {
+        right: -8rem;
+    }
 }
 
 .red-score-image, .blue-score-image {
@@ -579,11 +594,11 @@ button {
 .game-log {
     position: relative;
     margin-top: 0.5rem;
-    padding: 0 0 100% 0;
+    padding: 0 0 6rem 0;
     border-top: 2px solid var(--color-contrast);
     border-bottom: 2px solid var(--color-contrast);
     width: 100%;
-    height: calc(100% - 19rem);
+    height: calc(100% - 10rem);
     overflow-x: hidden;
     overflow-y: scroll;
     scroll-padding-bottom: 6rem;
@@ -629,7 +644,7 @@ button {
     width: 50%;
     height: 3rem;
     left: 50%;
-    bottom: -4rem;
+    bottom: -7.5rem;
     transform: translate(-50%);
     display: flex;
     justify-content: center;
