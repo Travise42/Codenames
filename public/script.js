@@ -96,6 +96,7 @@ function init() {
 // Handle Server
 
 client.on("joined-room", joinRoom);
+client.on("left-team", leaveTeam);
 client.on("update-players", updatePlayers);
 client.on("new-game", startGame);
 client.on("new-round", newRound);
@@ -212,7 +213,7 @@ function removeHomeScreen() {
 
 //? from server
 //? transition | Home Screen => Lobby Screen
-function joinRoom(roomCode, roomStatus, isHost = null) {
+function joinRoom(roomCode, isHost = null) {
     // Set room id and host value
     user.roomCode = roomCode;
     console.log(isHost);
@@ -224,7 +225,7 @@ function joinRoom(roomCode, roomStatus, isHost = null) {
 
     // Create Lobby screen
     removeHomeScreen();
-    createLobbyScreen(roomStatus);
+    createLobbyScreen();
 }
 
 //? from red-players-button
@@ -233,10 +234,53 @@ function joinTeam(team) {
     client.emit("join-team", user.team);
 }
 
-function createLobbyScreen(roomStatus) {
+function createLobbyScreen() {
+    /*
+    <header class="header">
+        <div class="header-title-container">
+            <h1>Code Names</h1>
+        </div>
+        <div class="room-code-container">
+            <h2>ROOMCODE</h2>
+        </div>
+    </header>
+    <main class="main">
+        <div class="red-players-container">
+            <h3 id="red-players-heading">Red Team</h3>
+
+            <ul id="red-players-list">
+                <li class="room-player">PLAYER1</li>
+                <li class="room-player">PLAYER2</li>
+            </ul>
+
+            <button id="red-players-button" disabled=true>Join</button>
+        </div>
+
+        <div class="blue-players-container">
+            <h3 id="blue-players-heading">Blue Team</h3>
+
+            <ul id="blue-players-list">
+                <li class="room-player">PLAYER3</li>
+                <li class="room-player">PLAYER4</li>
+            </ul>
+
+            <button id="blue-players-button">Join</button>
+        </div>
+
+        <div class="back-button-container">
+            <button id="home-button">Home</button>
+        </div>
+
+        <div class="lobby-buttons-container">
+            <button id="leave-button">Leave</button> 
+            <br>
+            <button id="play-button">Play</button>
+        </div>
+    </main>
+    */
+
     // Get header container
     const header_container = document.querySelector(".header");
-
     // Get main container
     const main_container = document.querySelector(".main");
 
@@ -303,24 +347,65 @@ function createLobbyScreen(roomStatus) {
     // Add blue players list to screen
     addChild(main_container, blue_players_container);
 
+    // Create home button container
+    const back_button_container = newElem("div", "back-button-container");
+
+    // Crate home button
+    const home_button = newElem("button", null, "home-button");
+    home_button.textContent = "Home";
+    home_button.addEventListener("click", () => {
+        client.emit("leave-game");
+        removeGameOverScreen();
+        removeGameScreen();
+        removeLobbyScreen();
+        createHomeScreen();
+
+        user.team = null;
+        user.roomCode = null;
+        user.role = null;
+        user.guesses = null;
+        user.isHost = null;
+    });
+
+    addChild(back_button_container, home_button);
+
+    // Add home button to main container
+    addChild(main_container, back_button_container);
+
+    // Create lobby buttons container
+    const lobby_buttons_container = newElem("div", "lobby-buttons-container");
+
+    // Create leave room button
+    const leave_button = newElem("button", null, "leave-button");
+    leave_button.textContent = "Leave";
+    leave_button.disabled = true;
+    leave_button.addEventListener("click", () => client.emit("leave-team"));
+
+    addChild(lobby_buttons_container, leave_button);
+    addChild(lobby_buttons_container, newElem("br"));
+
+    // Add lobby buttons to screen
+    addChild(main_container, lobby_buttons_container);
+
     // Stop if user is not host
     if (!user.isHost) return;
 
-    // create play button if user is host
-    const play_button_contianer = newElem("div", "play-button-container");
-
+    // Create play button if user is host
     const play_button = newElem("button", null, "play-button");
     play_button.textContent = "Play";
     play_button.disabled = true;
     play_button.addEventListener("click", () => client.emit("new-game"));
 
-    addChild(play_button_contianer, play_button);
-
-    // add play button to screen
-    addChild(main_container, play_button_contianer);
+    addChild(lobby_buttons_container, play_button);
 }
 
 function removeLobbyScreen() {
+    const home_button_container = document.querySelector(".back-button-container").remove();
+    const lobby_buttons_container = document.querySelector(".lobby-buttons-container").remove();
+
+    if (home_button_container != null) home_button_container.remove();
+    if (lobby_buttons_container != null) lobby_buttons_container.remove();
+
     const red_players_container = document.querySelector(".red-players-container");
     const blue_players_container = document.querySelector(".blue-players-container");
 
@@ -329,10 +414,6 @@ function removeLobbyScreen() {
 
     red_players_container.remove();
     blue_players_container.remove();
-
-    if (!user.isHost) return;
-
-    document.querySelector(".play-button-container").remove();
 }
 
 function playerLeft(playerTeam, playerRole, roomStatus, newHost) {
@@ -351,8 +432,29 @@ function playerLeft(playerTeam, playerRole, roomStatus, newHost) {
     //// nametags[playerTeam][playerRole].textContent = "DISCONNECTED";
 }
 
+function leaveTeam() {
+    user.team = null;
+    user.role = null;
+
+    // Get leave button
+    const leave_button = document.getElementById("leave-button");
+
+    if (leave_button == null) return;
+
+    leave_button.disabled = false;
+}
+
+function toggleLeaveButton(value = true) {
+    // Get leave button
+    const leave_button = document.getElementById("leave-button");
+
+    if (leave_button == null) return;
+
+    leave_button.disabled = value;
+}
+
 //? from server
-function updatePlayers(redTeam, blueTeam, roomStatus) {
+function updatePlayers(redTeam, blueTeam, roomStatus, playerRole = null) {
     // Get main container
     const main_container = document.querySelector(".main");
     if (main_container.classList.contains("playing-board")) {
@@ -400,24 +502,47 @@ function updatePlayers(redTeam, blueTeam, roomStatus) {
 
     document.querySelectorAll(".room-player").forEach((li) => li.remove());
 
-    redTeam.forEach((playerName) => {
+    redTeam.forEach((playerName, role) => {
         const list_element = newElem("li", "room-player");
         list_element.textContent = playerName;
+        if (user.team == RED && playerRole == role) {
+            addClass(list_element, "you");
+        }
 
         addChild(red_players_list, list_element);
     });
 
-    blueTeam.forEach((playerName) => {
+    blueTeam.forEach((playerName, role) => {
         const list_element = newElem("li", "room-player");
         list_element.textContent = playerName;
+        if (user.team == BLUE && playerRole == role) {
+            addClass(list_element, "you");
+        }
 
         addChild(blue_players_list, list_element);
     });
 
+    if (!redTeam.includes(null) && !blueTeam.includes(null)) {
+        toggleLeaveButton(false);
+    } else {
+        toggleLeaveButton(true);
+    }
+
     if (!user.isHost) return;
 
-    if (red_players_list.children.length >= 2 && blue_players_list.children.length >= 2) {
-        const play_button = document.getElementById("play-button");
+    let play_button = document.getElementById("play-button");
+
+    if (play_button == null) {
+        play_button = newElem("button", null, "play-button");
+        play_button.textContent = "Play";
+        play_button.disabled = true;
+        play_button.addEventListener("click", () => client.emit("new-game"));
+
+        const lobby_buttons_container = document.querySelector(".lobby-buttons-container");
+        addChild(lobby_buttons_container, play_button);
+    }
+
+    if (!redTeam.includes(null) && !blueTeam.includes(null)) {
         play_button.disabled = false;
     }
 }
@@ -573,10 +698,10 @@ function createGameScreen() {
     game_log_heading.addEventListener("click", () => {
         if (game_log_container.classList.contains("hidden")) {
             removeClass(game_log_container, "hidden");
-            game_log_container.textContent = "Game log...";
+            game_log_heading.textContent = "Game log...";
         } else {
             addClass(game_log_container, "hidden");
-            game_log_container.textContent = "Game log";
+            game_log_heading.textContent = "Game log";
         }
     });
 
@@ -1099,7 +1224,12 @@ function createGameOverScreen(winningTeam, causeMessage) {
         removeGameScreen();
         removeLobbyScreen();
         createHomeScreen();
-        user = {};
+
+        user.team = null;
+        user.roomCode = null;
+        user.role = null;
+        user.guesses = null;
+        user.isHost = null;
     });
 
     addChild(game_over_home_container, game_over_home_button);

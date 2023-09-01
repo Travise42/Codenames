@@ -267,7 +267,6 @@ function leaveRoom(client) {
     if (client.id == room.host) {
         room.host = getJoinedPlayerIds(roomCode).filter((playerId) => playerId != client.id)[0];
     }
-    console.log(room.host);
 
     // Player hasn't been cached in the room yet, no removing needed
     if (player.team == null) return;
@@ -286,13 +285,13 @@ function leaveRoom(client) {
     }
 
     // Tell players this player left the room
-    getPlayerIds(roomCode).forEach((playerId) => {
+    Array.from(io.sockets.adapter.rooms.get(roomCode)).forEach((playerId) => {
         io.to(playerId).emit(
             "update-players",
             getPlayerNames(roomCode, RED),
             getPlayerNames(roomCode, BLUE),
             room.status,
-            playerId == null ? null : players[playerId].role
+            players[playerId] == null ? null : players[playerId].role
         );
     });
 }
@@ -330,13 +329,13 @@ function joinTeam(client, team) {
     }
 
     // Tell players about the new player that joined
-    getPlayerIds(roomCode).forEach((playerId) => {
+    Array.from(io.sockets.adapter.rooms.get(roomCode)).forEach((playerId) => {
         io.to(playerId).emit(
             "update-players",
             getPlayerNames(roomCode, RED),
             getPlayerNames(roomCode, BLUE),
             room.status,
-            playerId == null ? null : players[playerId].role
+            players[playerId] == null ? null : players[playerId].role
         );
     });
 }
@@ -357,13 +356,13 @@ function leaveTeam(client) {
     client.emit("left-team");
 
     // Tell players about the player that left
-    getPlayerIds(roomCode).forEach((playerId) => {
+    io.sockets.adapter.rooms.get(roomCode).forEach((playerId) => {
         io.to(playerId).emit(
             "update-players",
             getPlayerNames(roomCode, RED),
             getPlayerNames(roomCode, BLUE),
             room.status,
-            playerId == null ? null : players[playerId].role
+            players[playerId] == null ? null : players[playerId].role
         );
     });
 }
@@ -486,6 +485,7 @@ function guessCard(client, pos) {
     // Get room code
     const roomCode = getRoomCode(client);
     const room = getRoom(roomCode);
+    const player = getPlayer(client);
 
     // Handle cheaters
     // Make sure it is the player's turn
@@ -510,14 +510,15 @@ function guessCard(client, pos) {
     handleGameOver(client, card);
 
     // Right guess: Go again
-    const guessIsCorrect = getPlayer(client).team == card.id;
-    const playerHasBonusGuess = room.guessesLeft == 0 && 0 < room.missedCards[getPlayer(client).team];
+    const guessIsCorrect = player.team == card.id;
+    const playerHasBonusGuess = room.guessesLeft == 0 && 0 < room.missedCards[player.team];
     const playerHasAnotherGuess = 0 < room.guessesLeft;
 
-    if (guessIsCorrect && playerHasBonusGuess) room.missedCards[getPlayer(client).team] -= 1;
+    if (guessIsCorrect && playerHasBonusGuess) room.missedCards[player.team] -= 1;
     if (guessIsCorrect && (playerHasAnotherGuess || playerHasBonusGuess)) return;
 
     // Wrong guess: Next turn
+    room.guessesLeft += 1;
     handleNewMissedCards(client);
     nextTurn(client);
 }
@@ -612,14 +613,14 @@ function changeTeams(client) {
     if (room == null) return;
 
     room.status = "lobby";
-    getPlayerIds(roomCode).forEach((playerId) => {
+    Array.from(io.sockets.adapter.rooms.get(roomCode)).forEach((playerId) => {
         io.to(playerId).emit("joined-room", roomCode, room.host == playerId);
         io.to(playerId).emit(
             "update-players",
             getPlayerNames(roomCode, RED),
             getPlayerNames(roomCode, BLUE),
             room.status,
-            playerId == null ? null : players[playerId].role
+            players[playerId] == null ? null : players[playerId].role
         );
     });
 }
