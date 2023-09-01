@@ -13,7 +13,6 @@ Start but.      Create but.     Join blue but.                  Main div.
 // ----------------------------------------------------------------------------------------------------
 // Define Constants
 
-////const GREEN = 2;
 const RED = 1;
 const BLUE = 2;
 const INNOCENT = 3;
@@ -21,7 +20,6 @@ const ASSASSIN = 4;
 
 const DEFAULT = INNOCENT;
 
-////2: {id: GREEN, string: 'green', card_path: 'img/cards/green.png', cover_paths: ['img/covers/green1.png', 'img/covers/green2.png']},
 const CARDIDS = {
     1: {
         id: RED,
@@ -416,20 +414,11 @@ function removeLobbyScreen() {
     blue_players_container.remove();
 }
 
-function playerLeft(playerTeam, playerRole, roomStatus, newHost) {
+function playerLeft(newHost) {
     if (client.id == newHost) {
         user.isHost = true;
         console.log("im host");
     }
-
-    //// if (roomStatus != "game") return;
-
-    //// const nametags = {
-    ////     1: [document.querySelector(".topleft-nametag-label"), document.querySelector(".bottomleft-nametag-label")],
-    ////     2: [document.querySelector(".topright-nametag-label"), document.querySelector(".bottomright-nametag-label")],
-    //// };
-
-    //// nametags[playerTeam][playerRole].textContent = "DISCONNECTED";
 }
 
 function leaveTeam() {
@@ -832,7 +821,7 @@ function newRound(cards, role, roles, turn, newScores) {
 // ----------------------------------------------------------------------------------------------------
 // Active Game Screen
 
-function addClueInput() {
+function createClueInput() {
     // get main container
     const main_container = document.querySelector(".main");
 
@@ -1045,7 +1034,7 @@ function nextTurn(newTurn, amount = 0) {
 
     if (isPlayersTurn) {
         user.guesses = amount;
-        addPlayingElements();
+        createPlayingElements();
     } else {
         removePlayingElements();
     }
@@ -1053,10 +1042,10 @@ function nextTurn(newTurn, amount = 0) {
     editTurnIndicator();
 }
 
-function addPlayingElements() {
+function createPlayingElements() {
     removePlayingElements();
 
-    if (user.role == SPYMASTER) addClueInput();
+    if (user.role == SPYMASTER) createClueInput();
     else document.querySelectorAll(".card").forEach((card_element) => addClass(card_element, "clickable"));
 }
 

@@ -1,6 +1,7 @@
 // ----------------------------------------------------------------------------------------------------
 // Import Functions
 
+const { Socket } = require("socket.io");
 const { randIntBetween, randInt, randFrom } = require("./func.js");
 
 // ----------------------------------------------------------------------------------------------------
@@ -24,7 +25,6 @@ http.listen(port, () => console.log(`Socket.IO server running at http://localhos
 // ----------------------------------------------------------------------------------------------------
 // Define Constants
 
-////const GREEN = 2;
 const RED = 1;
 const BLUE = 2;
 const INNOCENT = 3;
@@ -113,7 +113,6 @@ const players = {};
 // ----------------------------------------------------------------------------------------------------
 // Handle Sockets
 
-//TODO - OPTIMIZE
 io.on("connection", (client) => {
     // Home screen
     client.on("create-room", (...args) => createRoom(client, ...args));
@@ -217,7 +216,6 @@ function newRoom(roomCode) {
     return roomCode;
 }
 
-//TODO - OPTIMIZE
 //? from a client
 function createRoom(client, nickname) {
     do {
@@ -228,11 +226,10 @@ function createRoom(client, nickname) {
     joinRoom(client, newRoom(roomCode), nickname, true);
 }
 
-//TODO - OPTIMIZE
 //? from a client
 function joinRoom(client, roomCode, nickname, isHost = false) {
     if (rooms[roomCode] == null) return;
-    if (!isHost && Array.from(io.sockets.adapter.rooms.get(roomCode)).length >= 4) return;
+    if (!isHost && getPlayerIds(roomCode).length >= 4) return;
 
     const room = getRoom(roomCode);
 
@@ -272,7 +269,7 @@ function leaveRoom(client) {
     if (player.team == null) return;
 
     // Tell members that player left
-    io.to(roomCode).emit("player-left", player.team, player.role, room.status, room.host);
+    io.to(roomCode).emit("player-left", room.host);
 
     // Remove player from room
     room.players[player.team][player.role] = null;
@@ -285,7 +282,7 @@ function leaveRoom(client) {
     }
 
     // Tell players this player left the room
-    Array.from(io.sockets.adapter.rooms.get(roomCode)).forEach((playerId) => {
+    getPlayerIds(roomCode).forEach((playerId) => {
         io.to(playerId).emit(
             "update-players",
             getPlayerNames(roomCode, RED),
@@ -296,7 +293,6 @@ function leaveRoom(client) {
     });
 }
 
-//TODO - OPTIMIZE
 //? from a client
 function joinTeam(client, team) {
     const roomCode = getRoomCode(client);
@@ -329,7 +325,7 @@ function joinTeam(client, team) {
     }
 
     // Tell players about the new player that joined
-    Array.from(io.sockets.adapter.rooms.get(roomCode)).forEach((playerId) => {
+    getPlayerIds(roomCode).forEach((playerId) => {
         io.to(playerId).emit(
             "update-players",
             getPlayerNames(roomCode, RED),
@@ -421,7 +417,6 @@ function rotateRoles() {
     [SPYMASTER, OPPERATIVE] = [OPPERATIVE, SPYMASTER];
 }
 
-//TODO - OPTIMIZE
 //? from a client
 function newRound(client) {
     rotateRoles();
@@ -613,7 +608,7 @@ function changeTeams(client) {
     if (room == null) return;
 
     room.status = "lobby";
-    Array.from(io.sockets.adapter.rooms.get(roomCode)).forEach((playerId) => {
+    getPlayerIds(roomCode).forEach((playerId) => {
         io.to(playerId).emit("joined-room", roomCode, room.host == playerId);
         io.to(playerId).emit(
             "update-players",
@@ -657,7 +652,6 @@ function getRoomCode(client) {
     return player.roomCode;
 }
 
-//TODO - OPTIMIZE
 function getRoom(roomCode) {
     const room = rooms[roomCode];
     if (room != null) return room;
@@ -667,59 +661,88 @@ function getRoom(roomCode) {
     return null;
 }
 
+/**
+ * A function that takes two arguement.
+ * Gets the room using roomCode and uses team to get the player IDs.
+ * The IDs are mapped to get the player names.
+ * @param {String} roomCode the 3-digit room code
+ * @param {Number} team RED/BLUE
+ * @returns {String[]} the names of all the players on a certain team
+ */
 function getPlayerNames(roomCode, team) {
     const room = getRoom(roomCode);
+
     if (room == null) return null;
 
     return room.players[team].map(getPlayerName);
 }
 
-function getPlayerName(playerId) {
-    return playerId == null ? null : players[playerId].name;
+/**
+ * A function that takes one arguement.
+ * Uses the cached player data to retrieve the player's name.
+ * @param {String} playerID the player ID
+ * @returns {String} the player's name if the player is cached, otherwise, returns null
+ */
+function getPlayerName(playerID) {
+    return players[playerID] != null ? players[playerID].name : null;
 }
 
+/**
+ * A function that takes one arguement.
+ * Uses socket's adapter to retrieve the clients connected to a certain room.
+ * @param {String} roomCode the 3-digit room code
+ * @returns {String[]} the player IDs that have joined the room
+ */
 function getPlayerIds(roomCode) {
-    const room = getRoom(roomCode);
-    if (room == null) return;
-
-    const playerIds = [];
-
-    Object.values(room.players).forEach((teamMembers) => {
-        //TODO - TRY WITHOUT PARAMETERS
-        teamMembers.forEach((playerId) => playerIds.push(playerId));
-    });
-
-    return playerIds;
+    return Array.from(io.sockets.adapter.rooms.get(roomCode));
 }
 
+/**
+ * A function that takes one arguement.
+ * Uses the cached room data to retrieve
+ * @param {String} roomCode the 3-digit room code
+ * @returns {String[]} the player IDs that have joined a team
+ */
 function getJoinedPlayerIds(roomCode) {
     const room = getRoom(roomCode);
+
     if (room == null) return null;
 
-    const playerIds = [];
-
-    Object.values(room.players).forEach((teamMembers) => {
-        teamMembers.forEach((playerId) => {
-            if (playerId == null) return;
-            playerIds.push(playerId);
-        });
-    });
-
-    return playerIds;
+    return [...room.players[RED], ...room.players[BLUE]].filter((playerId) => playerId != null);
 }
 
+/**
+ * A function that takes no arguements.
+ * Uses the set of cached room data to retrieve every room code
+ * Get the room code of every room
+ * @returns {String[]} the room code of every room
+ */
 function getRoomCodes() {
     return Object.keys(rooms);
 }
 
-// Check if it is the player's turn
+/**
+ * A function that takes one arguement.
+ * @param {Socket} client Any connected socket
+ * @returns {Boolean | null} true if it is the client's turn
+ */
 function isActive(client) {
-    return client.id == getActivePlayerId(getRoomCode(client));
+    const room = getRoom(roomCode);
+
+    if (room == null) return null;
+
+    return client.id == getActivePlayerId(room);
 }
 
+/**
+ * A function that takes one arguement
+ * @param {String} roomCode the 3-digit room code
+ * @returns {String | null} the id of the player whose turn it is
+ */
 function getActivePlayerId(roomCode) {
     const room = getRoom(roomCode);
-    if (room == null) return;
+
+    if (room == null) return null;
 
     return room.players[room.turn.team][room.turn.role];
 }
