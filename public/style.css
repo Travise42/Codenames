@@ -69,6 +69,7 @@ button {
     transition: all 100ms linear;
     cursor: pointer;
     border-radius: 1rem;
+    padding: 0;
     
     &:hover {
         background: var(--color-highlight);
@@ -248,7 +249,6 @@ button {
 
 .main {
     &.playing-board {
-        height: 60vh;
         display: flex;
         justify-content: center;
         border-radius: 2rem;
@@ -263,9 +263,9 @@ button {
 
 .card-container {
     position: relative;
-    width: calc( min( 82vh, var(--card-width) * 16 / 15 * 5 ) );
-    height: calc( min( min( 54vh, 61vw ), var(--card-height) * 16 / 15 * 5 ) );
-    font-size: calc( min( min( 1.6vh, 1.8vw ), var(--card-height) / 6 ) );
+    width: calc( var(--card-width) * 16 / 15 * 5 );
+    height: calc( min( 61vw, var(--card-height) * 16 / 15 * 5 ) );
+    font-size: calc( min( 1.8vw, var(--card-height) / 6 ) );
     display: grid;
     margin: 1rem;
     padding: 0.5rem;
@@ -578,6 +578,12 @@ button {
 
     &.hidden {
         height: 2.5rem;
+        transition: opacity 200ms ease-in-out;
+        
+        &:not(:hover) {
+            opacity: 50%;
+        }
+        
         .game-log {
             visibility: hidden;
         }
