@@ -695,6 +695,9 @@ function createGameScreen() {
     const game_log_container = newElem("div", "game-log-container");
     addClass(game_log_container, "hidden");
 
+    // Create game log elements
+    const game_log_elements = newElem("div", "game-log-elements");
+
     // Create game log heading
     const game_log_heading = newElem("h3", "game-log-heading");
     game_log_heading.textContent = "Game log...";
@@ -702,20 +705,23 @@ function createGameScreen() {
         if (game_log_container.classList.contains("hidden")) {
             removeClass(game_log_container, "hidden");
             game_log_heading.textContent = "Game log";
+            const log_alert = document.querySelector(".log-alert");
+            if (log_alert != null) log_alert.remove();
         } else {
             addClass(game_log_container, "hidden");
             game_log_heading.textContent = "Game log...";
         }
     });
 
-    addChild(game_log_container, game_log_heading);
+    addChild(game_log_elements, game_log_heading);
 
     // Create game log list
     const game_log_list = newElem("ul", "game-log", "game-log");
 
-    addChild(game_log_container, game_log_list);
+    addChild(game_log_elements, game_log_list);
 
     // Add game log container to main container
+    addChild(game_log_container, game_log_elements);
     addChild(main_container, game_log_container);
 }
 
@@ -1008,6 +1014,8 @@ function passGuess() {
 
 //? from server
 function reciveClue(clue, amount, senderName, senderTeam) {
+    // Get game log container
+    const game_log_container = document.querySelector(".game-log-container");
     // Get game log
     const game_log = document.getElementById("game-log");
 
@@ -1016,6 +1024,12 @@ function reciveClue(clue, amount, senderName, senderTeam) {
     addClass(log_message, CARDIDS[senderTeam].string);
     log_message.textContent = `${senderName}: '${clue}' for ${amount}`;
     addChild(game_log, log_message);
+
+    if (game_log_container.classList.contains("hidden")) {
+        const log_alert = newElem("img", "log-alert");
+        addPath(log_alert, "img/icons/alert.png");
+        addChild(game_log_container, log_alert);
+    }
 
     game_log.scrollTop = game_log.scrollHeight;
 }

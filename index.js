@@ -20,7 +20,11 @@ app.get("/", (req, res) => {
     res.sendFile(`${__dirname}/index.html`);
 });
 
-http.listen(port, () => console.log(`Socket.IO server running at http://localhost:${port}/`));
+http.listen(port, () =>
+    console.log(
+        `Socket.IO server running at http://yardleys.internal.curtly.ca:${port}/\nFind it at http://www.volcise.com/`
+    )
+);
 
 // ----------------------------------------------------------------------------------------------------
 // Define Constants
@@ -671,7 +675,6 @@ function getRoom(roomCode) {
  */
 function getPlayerNames(roomCode, team) {
     const room = getRoom(roomCode);
-
     if (room == null) return null;
 
     return room.players[team].map(getPlayerName);
@@ -705,7 +708,6 @@ function getPlayerIds(roomCode) {
  */
 function getJoinedPlayerIds(roomCode) {
     const room = getRoom(roomCode);
-
     if (room == null) return null;
 
     return [...room.players[RED], ...room.players[BLUE]].filter((playerId) => playerId != null);
@@ -727,11 +729,10 @@ function getRoomCodes() {
  * @returns {Boolean | null} true if it is the client's turn
  */
 function isActive(client) {
-    const room = getRoom(roomCode);
+    const roomCode = getRoomCode(client);
+    if (roomCode == null) return null;
 
-    if (room == null) return null;
-
-    return client.id == getActivePlayerId(room);
+    return client.id == getActivePlayerId(roomCode);
 }
 
 /**
@@ -741,7 +742,6 @@ function isActive(client) {
  */
 function getActivePlayerId(roomCode) {
     const room = getRoom(roomCode);
-
     if (room == null) return null;
 
     return room.players[room.turn.team][room.turn.role];
