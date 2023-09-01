@@ -531,6 +531,13 @@ button {
     border-radius: 1.6rem;
     border: 2px solid var(--color-contrast);
     background: var(--color-secondary);
+
+    &.hidden {
+        height: 2.5rem;
+        .game-log {
+            visibility: hidden;
+        }
+    }
 }
 
 .game-log-heading {
@@ -547,7 +554,7 @@ button {
     border-top: 2px solid var(--color-contrast);
     border-bottom: 2px solid var(--color-contrast);
     width: 100%;
-    height: 30%;
+    height: calc(100% - 19rem);
     overflow-x: hidden;
     overflow-y: scroll;
     scroll-padding-bottom: 6rem;

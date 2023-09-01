@@ -395,10 +395,8 @@ function updatePlayers(redTeam, blueTeam, roomStatus) {
     const red_players_list = document.getElementById("red-players-list");
     const blue_players_list = document.getElementById("blue-players-list");
 
-    join_red_button.disabled =
-        (roomStatus == "lobby" && user.team == RED) || (roomStatus == "game" && !redTeam.includes(null));
-    join_blue_button.disabled =
-        (roomStatus == "lobby" && user.team == BLUE) || (roomStatus == "game" && !blueTeam.includes(null));
+    join_red_button.disabled = user.team == RED || !redTeam.includes(null);
+    join_blue_button.disabled = user.team == BLUE || !blueTeam.includes(null);
 
     document.querySelectorAll(".room-player").forEach((li) => li.remove());
 
@@ -567,10 +565,20 @@ function createGameScreen() {
 
     // Create game log container
     const game_log_container = newElem("div", "game-log-container");
+    addClass(game_log_container, "hidden");
 
     // Create game log heading
     const game_log_heading = newElem("h3", "game-log-heading");
-    game_log_heading.textContent = "Game log";
+    game_log_heading.textContent = "Game log...";
+    game_log_heading.addEventListener("click", () => {
+        if (game_log_container.classList.contains("hidden")) {
+            removeClass(game_log_container, "hidden");
+            game_log_container.textContent = "Game log...";
+        } else {
+            addClass(game_log_container, "hidden");
+            game_log_container.textContent = "Game log";
+        }
+    });
 
     addChild(game_log_container, game_log_heading);
 
@@ -670,9 +678,9 @@ function gridCard(card, pos) {
 
 //? from server
 //? event | Empty Game Screen => Active Game Screen
-function newRound(cards, role, turn, newScores) {
+function newRound(cards, role, roles, turn, newScores) {
     removeGameOverScreen();
-    setRole(role);
+    setRole(role, roles);
     clearLog();
     clearCovers();
     editCards(cards);
@@ -907,7 +915,7 @@ function nextTurn(newTurn, amount = 0) {
 function addPlayingElements() {
     removePlayingElements();
 
-    if (user.role) addClueInput();
+    if (user.role == SPYMASTER) addClueInput();
     else document.querySelectorAll(".card").forEach((card_element) => addClass(card_element, "clickable"));
 }
 
@@ -990,13 +998,14 @@ function updateHighlightedNametags() {
 // ----------------------------------------------------------------------------------------------------
 // Player Functions
 
-function setRole(newRole) {
-    user.role = newRole;
-    rotateRoles();
+function setRole(playerRole, roles = null) {
+    user.role = playerRole;
+    updateRoles(roles);
 }
 
-function rotateRoles() {
-    [SPYMASTER, SPYMASTER] = [SPYMASTER, SPYMASTER];
+function updateRoles(roles) {
+    if (roles == null) return;
+    [SPYMASTER, OPPERATIVE] = roles;
 }
 
 // ----------------------------------------------------------------------------------------------------
