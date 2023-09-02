@@ -117,6 +117,9 @@ const players = {};
 // ----------------------------------------------------------------------------------------------------
 // Handle Sockets
 
+/**
+ * 
+ */
 io.on("connection", (client) => {
     // Home screen
     client.on("create-room", (...args) => createRoom(client, ...args));
@@ -132,7 +135,7 @@ io.on("connection", (client) => {
 
     // game over screen
     client.on("change-teams", () => changeTeams(client));
-    client.on("next-game", () => nextGame(client));
+    client.on("next-game", () => newRound(client));
     client.on("leave-game", () => leaveGame(client));
 
     // leaving game
@@ -143,6 +146,12 @@ io.on("connection", (client) => {
 // Handle Creating & Joining Rooms
 
 // Add player to cached players
+/**
+ * 
+ * @param {Socket} client any connected socket
+ * @param {*} roomCode 
+ * @param {*} nickname 
+ */
 function cachePlayer(client, roomCode, nickname) {
     /*
     <player-id>: {
@@ -160,10 +169,19 @@ function cachePlayer(client, roomCode, nickname) {
     };
 }
 
+/**
+ * 
+ * @param {Socket} client any connected socket
+ */
 function uncachePlayer(client) {
     delete players[client.id];
 }
 
+/**
+ * 
+ * @param {*} roomCode 
+ * @returns 
+ */
 function newRoom(roomCode) {
     rooms[roomCode] = {
         roomCode: roomCode,
@@ -221,6 +239,11 @@ function newRoom(roomCode) {
 }
 
 //? from a client
+/**
+ * 
+ * @param {Socket} client any connected socket
+ * @param {*} nickname 
+ */
 function createRoom(client, nickname) {
     do {
         var roomCode =
@@ -231,6 +254,14 @@ function createRoom(client, nickname) {
 }
 
 //? from a client
+/**
+ * 
+ * @param {Socket} client any connected socket
+ * @param {*} roomCode 
+ * @param {*} nickname 
+ * @param {*} isHost 
+ * @returns 
+ */
 function joinRoom(client, roomCode, nickname, isHost = false) {
     if (rooms[roomCode] == null) return;
     if (!isHost && getPlayerIds(roomCode).length >= 4) return;
@@ -249,6 +280,12 @@ function joinRoom(client, roomCode, nickname, isHost = false) {
 }
 
 //? uncachePlayer must NOT be called before leaveRoom
+/**
+ * 
+ * @param {Socket} client any connected socket
+ * @returns 
+ * @warning
+ */
 function leaveRoom(client) {
     if (players[client.id] == null) return;
 
@@ -298,6 +335,12 @@ function leaveRoom(client) {
 }
 
 //? from a client
+/**
+ * 
+ * @param {Socket} client any connected socket
+ * @param {*} team 
+ * @returns 
+ */
 function joinTeam(client, team) {
     const roomCode = getRoomCode(client);
     const room = getRoom(roomCode);
@@ -340,6 +383,11 @@ function joinTeam(client, team) {
     });
 }
 
+/**
+ * 
+ * @param {Socket} client any connected socket
+ * @returns 
+ */
 function leaveTeam(client) {
     const roomCode = getRoomCode(client);
     const room = getRoom(roomCode);
@@ -367,6 +415,12 @@ function leaveTeam(client) {
     });
 }
 
+/**
+ * 
+ * @param {*} roomCode 
+ * @param {*} playerTeam 
+ * @returns 
+ */
 function getEmptySpaceOnTeam(roomCode, playerTeam) {
     const room = getRoom(roomCode);
     if (room.players[playerTeam][0] == null) return 0;
@@ -377,8 +431,12 @@ function getEmptySpaceOnTeam(roomCode, playerTeam) {
 // ----------------------------------------------------------------------------------------------------
 // Start a New Game
 
-//TODO - OPTIMIZE
 //? from a client
+/**
+ * 
+ * @param {Socket} client any connected socket
+ * @returns 
+ */
 function newGame(client) {
     const roomCode = getRoomCode(client);
     const room = getRoom(roomCode);
@@ -399,10 +457,13 @@ function newGame(client) {
     newRound(client);
 }
 
-// ----------------------------------------------------------------------------------------------------
-// Start a New Round
-
-//TODO - OPTIMIZE
+/**
+ * 
+ * @param {*} cards 
+ * @param {*} amount 
+ * @param {*} id 
+ * @returns 
+ */
 function setCards(cards, amount, id) {
     i = 0;
     while (i < amount) {
@@ -417,16 +478,26 @@ function setCards(cards, amount, id) {
 }
 
 // Change who is code master
+/**
+ * 
+ */
 function rotateRoles() {
     [SPYMASTER, OPPERATIVE] = [OPPERATIVE, SPYMASTER];
 }
 
 //? from a client
+/**
+ * 
+ * @param {Socket} client any connected socket
+ */
 function newRound(client) {
     rotateRoles();
 
     const roomCode = getRoomCode(client);
     const room = getRoom(roomCode);
+
+    // Change the status of the room so players know what state the game is is
+    room.status = "game";
 
     // Change which team goes first
     room.startingTeam = room.startingTeam != RED ? RED : BLUE;
@@ -479,49 +550,75 @@ function newRound(client) {
 // ----------------------------------------------------------------------------------------------------
 // Handle Guessing Cards
 
-//? from a client
+/**
+ * A function that takes two arguements.
+ * Checks the card the opperative guessed and covers it with the corresponding card.
+ * 
+ * ? Called upon by the client.
+ * @param {Socket} client any connected socket
+ * @param {*} pos 
+ * @returns 
+ */
 function guessCard(client, pos) {
-    // Get room code
+    // Get cached data
     const roomCode = getRoomCode(client);
     const room = getRoom(roomCode);
+    // If the room isn't cached...
+    if (room == null) return;
+
     const player = getPlayer(client);
+
+    // Get guessed card
+    const card = room.cards[pos];
+    // If the given card pos doesn't exist...
+    if (card == null) return;
+
+    // Make sure the player can't click already guessed cards
+    if (card.covered) return;
 
     // Handle cheaters
     // Make sure it is the player's turn
     if (!isActive(client)) return;
 
-    // Get guessed card
-    const card = room.cards[pos];
-    if (card == null || card.covered) return;
-
     // Cover guessed card
     card.covered = true;
+
     // If card is RED or BLUE, then decrease score of the card's team
     if (room.scores[card.id] != null) room.scores[card.id] -= 1;
+
     // Decrease player's guesses left
     room.guessesLeft -= 1;
+
     // Tell members to cover the chosen card
     io.to(roomCode).emit("cover-card", pos, card.id, room.scores);
-    // Tell player that they made a valid guess
+    // Tell the player that they made a valid guess
     client.emit("made-guess", room.guessesLeft);
 
-    // Handle game over
+    // Check if the game should end
     handleGameOver(client, card);
 
-    // Right guess: Go again
     const guessIsCorrect = player.team == card.id;
-    const playerHasBonusGuess = room.guessesLeft == 0 && 0 < room.missedCards[player.team];
+    const usedBonusGuess = room.guessesLeft == 0 && 0 < room.missedCards[player.team];
     const playerHasAnotherGuess = 0 < room.guessesLeft;
 
-    if (guessIsCorrect && playerHasBonusGuess) room.missedCards[player.team] -= 1;
-    if (guessIsCorrect && (playerHasAnotherGuess || playerHasBonusGuess)) return;
+    // Correct guess
+    if (guessIsCorrect && usedBonusGuess) room.missedCards[player.team] -= 1;
+    if (guessIsCorrect && playerHasAnotherGuess || usedBonusGuess) return;
 
-    // Wrong guess: Next turn
+    // Inncorrect guess: Next turn
     room.guessesLeft += 1;
     handleNewMissedCards(client);
     nextTurn(client);
 }
 
+/**
+ * A function that takes one arguement.
+ * Ends the player's turn early when they hit the "PASS" button.
+ * 
+ * ? Called upon by the client.
+ * @param {Socket} client any connected socket
+ * @returns 
+ */
 function passGuess(client) {
     // Handle cheaters
     // Make sure it is the player's turn
@@ -531,43 +628,74 @@ function passGuess(client) {
     nextTurn(client);
 }
 
+/**
+ * A function that takes one arguement.
+ * Handles any cards the player may have missed at the end of their turn.
+ * 
+ * If the player missed any cards, they can guess one extra card at the end of their turn granted they got nothing wrong.
+ * @param {Socket} client any connected socket
+ */
 function handleNewMissedCards(client) {
+    // Get cached data
     const room = getRoom(getRoomCode(client));
-    if (room == null) return;
 
-    if (0 < room.guessesLeft) room.missedCards[getPlayer(client).team] += room.guessesLeft;
+    // If the room is not cached...
+    if (room == null) return;
+    // If the amount of guesses left at the end of the palyer's turn is 0 or less...
+    if (room.guessesLeft <= 0) return;
+    
+    const player = getPlayer(client);
+    room.missedCards[player.team] += room.guessesLeft;
 }
 
+/**
+ * A function that takes two arguements.
+ * Checks the scores of both teams and initiates the end of the game with either team has 0 cards left or the assassin was found.
+ * @param {Socket} client any connected socket
+ * @param {object} card the card object containing the card data
+ */
 function handleGameOver(client, card) {
+    // Get cached data
     const roomCode = getRoomCode(client);
     const room = getRoom(roomCode);
+
+    // If the room is not cached...
     if (room == null) return;
+
+    if (card.id == ASSASSIN) {
+        // Tell all members that the assassin was chosen
+        room.status = "game-over";
+        io.to(roomCode).emit("game-over", getPlayer(client).team != RED ? RED : BLUE, "Found The Assassin");
+        return;
+    }
 
     const teamHasNoCardsLeft = room.scores[card.id] <= 0;
 
     if (teamHasNoCardsLeft) {
         // Tell all members that all agents are found
+        room.status = "game-over";
         io.to(roomCode).emit("game-over", card.id, "Found All Agents");
-        room.status = "game-over";
-
-        return;
-    }
-
-    if (card.id == ASSASSIN) {
-        // Tell all members that the assassin was chosen
-        io.to(roomCode).emit("game-over", getPlayer(client).team != RED ? RED : BLUE, "Found The Assassin");
-        room.status = "game-over";
     }
 }
 
 // ----------------------------------------------------------------------------------------------------
 // Handle Giving Clues
 
-//? from a client
+/**
+ * A function that takes three arguements.
+ * Handles the values given by the spymaster by making sure the clue is valid and the amount is between 0 and 9.
+ * 
+ * ? Called upon by the client.
+ * @param {Socket} client any connected socket
+ * @param {String} clue the entered clue given by the spymaster
+ * @param {Number} amount the entered amount value given by the spymaster
+ */
 function giveClue(client, clue, amount) {
-    // Get room code
+    // Get cached data
     const roomCode = getRoomCode(client);
     const room = getRoom(roomCode);
+
+    // Do nothing is the room doesn't exist
     if (room == null) return;
 
     // Handle cheaters
@@ -575,6 +703,8 @@ function giveClue(client, clue, amount) {
     if (!isActive(client)) return;
     // Make sure the clue has content
     if (!clue) return;
+    // Make sure the amount is between 0 and 9
+    if (0 <= amount && amount <= 9) return;
 
     // Reset opperative's guesses left
     room.guessesLeft = amount;
@@ -588,11 +718,24 @@ function giveClue(client, clue, amount) {
 // ----------------------------------------------------------------------------------------------------
 // Handle Turns
 
+/**
+ * A function that takes two arguements.
+ * End the current player's turn and start the turn of the next player.
+ * 
+ * If the current player whose turn it is is the spymaster, the next player will be their teamate (an opperative),
+ *  otherwise, the next team will go with their spymaster starting.
+ * @param {Socket} client any connected socket
+ * @param {Number} amount the amount of cards related to the spymaster's clue, and the amount of guesses the opperative has
+ */
 function nextTurn(client, amount = 0) {
+    // Get cached data
     const roomCode = getRoomCode(client);
     const room = getRoom(roomCode);
+
+    // Do nothing if the room doesn't exist
     if (room == null) return;
 
+    // Switch to next turn
     if (room.turn.role == SPYMASTER) {
         room.turn.role = OPPERATIVE;
     } else {
@@ -600,18 +743,32 @@ function nextTurn(client, amount = 0) {
         room.turn.role = SPYMASTER;
     }
 
+    // Tell players about the turn change
     io.to(roomCode).emit("next-turn", room.turn, amount);
 }
 
 // ----------------------------------------------------------------------------------------------------
 // Game Over Screen
 
+/**
+ * A function that takes one arguement.
+ * Bring the game back to the lobby where players can switch teams.
+ * 
+ * ? Called upon by the client.
+ * @param {Socket} client any connected socket
+ */
 function changeTeams(client) {
+    // Get cached data
     const roomCode = getRoomCode(client);
     const room = getRoom(roomCode);
+
+    // Do nothing if the room doesn't exist
     if (room == null) return;
 
+    // Set the status of the room so that players know what state the game is in
     room.status = "lobby";
+
+    // Tell all players connected to the room to change to the lobby screen
     getPlayerIds(roomCode).forEach((playerId) => {
         io.to(playerId).emit("joined-room", roomCode, room.host == playerId);
         io.to(playerId).emit(
@@ -621,52 +778,58 @@ function changeTeams(client) {
             room.status,
             players[playerId] == null ? null : players[playerId].role
         );
-    });
+    });  
 }
 
-function nextGame(client) {
-    newRound(client);
-    const room = getRoom(getRoomCode(client));
-    if (room == null) return;
+// ----------------------------------------------------------------------------------------------------
+// Leaving the Game
 
-    room.status = "game";
-}
-
+/**
+ * A function that takes one arguement.
+ * Removes the player from cached player data and cached room data.
+ * @param {Socket} client any connected socket
+ */
 function leaveGame(client) {
     leaveRoom(client);
     uncachePlayer(client);
 }
 
 // ----------------------------------------------------------------------------------------------------
-//
-// ----------------------------------------------------------------------------------------------------
-// Room Functions
+// Room Functions //!DONE!//
 
+/**
+ * A function that takes one arguement.
+ * Uses cached player data to retrieve a certain player's data
+ * @param {Socket} client any connected socket
+ * @returns {object | null} an object containing all stored player data
+ */
 function getPlayer(client) {
-    const player = players[client.id];
-    if (player != null) return player;
-
-    // Player is not cached
-    console.log(`ERROR || Player not found:\nPlayer id of ${client.id} does not exist`);
-    return null;
-}
-
-function getRoomCode(client) {
-    const player = getPlayer(client);
-    return player.roomCode;
-}
-
-function getRoom(roomCode) {
-    const room = rooms[roomCode];
-    if (room != null) return room;
-
-    // Room code does not exist
-    console.log(`ERROR || Room not found:\nRoom code of ${roomCode} does not exist`);
-    return null;
+    // Get cached data
+    return players[client.id] ?? console.log(`ERROR || Player not found:\nPlayer id of ${client.id} does not exist`);
 }
 
 /**
- * A function that takes two arguement.
+ * A function that takes one arguement.
+ * Uses cached room data to retrieve a certain room's data.
+ * @param {String} roomCode the 3-digit room code
+ * @returns {object | null} an object containing all stored game data
+ */
+function getRoom(roomCode) {
+    return rooms[roomCode] ?? console.log(`ERROR || Room not found:\nRoom code of ${roomCode} does not exist`);
+}
+
+/**
+ * A function that takes one arguement.
+ * Uses cached player data to retrieve the room a certain player is in.
+ * @param {Socket} client any connected socket
+ * @returns {String | null} the 3-digit room code
+ */
+function getRoomCode(client) {
+    getPlayer(client)?.roomCode;
+}
+
+/**
+ * A function that takes two arguements.
  * Gets the room using roomCode and uses team to get the player IDs.
  * The IDs are mapped to get the player names.
  * @param {String} roomCode the 3-digit room code
@@ -674,10 +837,7 @@ function getRoom(roomCode) {
  * @returns {String[]} the names of all the players on a certain team
  */
 function getPlayerNames(roomCode, team) {
-    const room = getRoom(roomCode);
-    if (room == null) return null;
-
-    return room.players[team].map(getPlayerName);
+    getRoom(roomCode)?.players[team].map(getPlayerName);
 }
 
 /**
@@ -687,7 +847,7 @@ function getPlayerNames(roomCode, team) {
  * @returns {String} the player's name if the player is cached, otherwise, returns null
  */
 function getPlayerName(playerID) {
-    return players[playerID] != null ? players[playerID].name : null;
+    return players[playerID]?.name;
 }
 
 /**
@@ -697,54 +857,67 @@ function getPlayerName(playerID) {
  * @returns {String[]} the player IDs that have joined the room
  */
 function getPlayerIds(roomCode) {
+    // Use socket's adapter to get players currently connected
+    // Add convert into an array for easier use
     return Array.from(io.sockets.adapter.rooms.get(roomCode));
 }
 
 /**
  * A function that takes one arguement.
- * Uses the cached room data to retrieve
+ * Uses the cached room data to retrieve the ID of all the players currently in a team.
  * @param {String} roomCode the 3-digit room code
  * @returns {String[]} the player IDs that have joined a team
  */
 function getJoinedPlayerIds(roomCode) {
+    // Get cached data
     const room = getRoom(roomCode);
+
+    // If the room isn't cached...
     if (room == null) return null;
 
+    // Room is defined
+    // Get the red and blue player IDs and filter out the undefined values
     return [...room.players[RED], ...room.players[BLUE]].filter((playerId) => playerId != null);
 }
 
 /**
  * A function that takes no arguements.
- * Uses the set of cached room data to retrieve every room code
- * Get the room code of every room
+ * Uses the set of cached room data to retrieve an array of every room code
  * @returns {String[]} the room code of every room
  */
 function getRoomCodes() {
+    // As rooms is an object with keys (room codes) leading to values (room data)
+    // The keys can be used to get the room codes
     return Object.keys(rooms);
 }
 
 /**
  * A function that takes one arguement.
- * @param {Socket} client Any connected socket
- * @returns {Boolean | null} true if it is the client's turn
+ * Uses cached room data to compare the client and the active player.
+ * @param {Socket} client any connected socket
+ * @returns {Boolean | null} true if it is the client's turn, otherwise, false
  */
 function isActive(client) {
+    // Get cached data
     const roomCode = getRoomCode(client);
-    if (roomCode == null) return null;
 
-    return client.id == getActivePlayerId(roomCode);
+    // Get the player ID of whom's turn it is
+    const activePlayerID = getActivePlayerId(roomCode);
+
+    return activePlayerID ?? client.id == activePlayerID;
 }
 
 /**
- * A function that takes one arguement
+ * A function that takes one arguement.
+ * Uses the cached room data to retrive the player ID of whom's turn it is.
  * @param {String} roomCode the 3-digit room code
  * @returns {String | null} the id of the player whose turn it is
  */
 function getActivePlayerId(roomCode) {
+    // Get cached data
     const room = getRoom(roomCode);
-    if (room == null) return null;
 
-    return room.players[room.turn.team][room.turn.role];
+    return room?.players[room.turn.team][room.turn.role];
 }
 
 // ----------------------------------------------------------------------------------------------------
