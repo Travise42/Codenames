@@ -22,6 +22,28 @@
 
 body {
     background: var(--color-tertiary);
+    overflow-x: hidden;
+    overflow-y: hidden;
+
+    @media only screen and (max-height: 30rem) {
+        overflow-y: scroll;
+    }
+}
+
+.header {
+    &.playing-board {
+        @media only screen and (max-height: 60rem) {
+            .header-title-container {
+                display: none;
+            }
+        }
+    
+        @media only screen and (max-height: 55rem) {
+            .room-code-container {
+                display: none;
+            }
+        }
+    }
 }
 
 /* <<< Standard for headings >>> */
@@ -36,6 +58,7 @@ h1 {
     transform: translateX(-50%);
     color: var(--color-contrast);
 }
+
 h2, h3 {
     text-align: center;
     color: var(--color-contrast);
@@ -211,13 +234,16 @@ button {
 }
 
 .lobby-buttons-container {
+    position: absolute;
     font-family: Verdana, Geneva, Tahoma, sans-serif;
     font-size: 1.1rem;
     text-align: center;
-    padding: 2.2rem;
+    padding-top: 2.2rem;
+    width: 100%;
+    left: 0;
 
     &:not(:has(#play-button)) {
-        padding: 4rem;
+        padding-top: 4rem;
     }
 
     #leave-button {
@@ -231,6 +257,10 @@ button {
         position: relative;
         width: 4rem;
         height: 3rem;
+    }
+
+    @media only screen and (max-width: 50rem) {
+        margin-top: 12rem;
     }
 }
 
@@ -256,18 +286,24 @@ button {
         border-radius: 2rem;
         border: 1px solid black;
         position: relative;
+        
         margin-top: 8rem;
+        
         font-family: Verdana, Geneva, Tahoma, sans-serif;
         border: 5px solid var(--color-contrast);
         background: var(--color-primary);
+
+        @media only screen and (max-height: 50rem) and (min-width: 60rem) {
+            margin-top: 5rem;
+        }
     }
 }
 
 .card-container {
     position: relative;
-    width: calc( var(--card-width) * 16 / 15 * 5 );
-    height: calc( min( 61vw, var(--card-height) * 16 / 15 * 5 ) );
-    font-size: calc( min( 1.8vw, var(--card-height) / 6 ) );
+    width: calc( min(90vh, var(--card-width) * 16 / 15 * 5) );
+    height: calc( min( min(60vh, 61vw), var(--card-height) * 16 / 15 * 5 ) );
+    font-size: calc( min( min(2vh, 1.8vw), var(--card-height) / 6 ) );
     display: grid;
     margin: 1rem;
     padding: 0.5rem;
@@ -487,6 +523,10 @@ button {
     height: 3rem;
     text-align: center;
     transform: translateX(-50%);
+
+    @media only screen and (max-height: 50rem) and (min-width: 60rem) {
+        top: calc(max(-25vw / 1.5 - 2.5rem, -4rem));
+    }
 }
 
 .turn-indicator {
@@ -505,20 +545,25 @@ button {
 }
 
 .red-score-container, .blue-score-container {
-    position: fixed;
+    position: absolute;
     width: var(--card-width);
     height: var(--card-height);
-    top: 0.5rem;
+    top: -11rem;
     font-family: Verdana, Geneva, Tahoma, sans-serif;
     font-size: 2rem;
 
     &.hidden .red-score-heading, &.hidden .blue-score-heading {
         visibility: hidden;
     }
+
+    @media only screen and (max-height: 55rem) and (min-width: 60rem) {
+        top: 50%;
+        transform: translateY(-50%);
+    }
 }
 
 .red-score-container {
-    left: 0.5rem;
+    left: 1rem;
 
     &.hidden {
         left: -8rem;
@@ -526,7 +571,7 @@ button {
 }
 
 .blue-score-container {
-    right: 0.5rem;
+    right: 1rem;
 
     &.hidden {
         right: -8rem;
@@ -546,7 +591,7 @@ button {
     width: 40%;
     height: 50%;
     right: 0;
-    top: 0;
+    bottom: 0;
     margin: 0;
     color: white;
 }
@@ -701,13 +746,15 @@ button {
 
 .give-clue-container {
     position: absolute;
-    width: 50%;
-    height: 3rem;
-    left: 50%;
-    bottom: -7.5rem;
-    transform: translate(-50%);
+    width: 100%;
+    left: 0;
+    bottom: calc(max(-25vw / 1.5 - 1.5rem, -7.5rem));
     display: flex;
     justify-content: center;
+
+    @media only screen and (max-height: 50rem) and (min-width: 60rem) {
+        bottom: calc(max(-30vw, -4rem));
+    }
 }
 
 .clue-input, .clue-amount-input, .give-clue-button {
@@ -717,25 +764,30 @@ button {
 }
 
 .clue-input {
-    margin-right: 1rem;
+    margin-right: 1vw;
     height: 90%;
     width: 15rem;
     padding-left: 1rem;
-    font-size: 1.1rem;
+    font-size: calc(min(3vw, 1.1rem));
+    padding: calc(min(2.333vw, 0.7rem)) calc(min(3.333vw, 1rem));
 }
 
 .clue-amount-input {
-    margin-right: 1rem;
+    margin-right: 1vw;
     height: 90%;
     width: 3rem;
     padding-left: 1rem;
     text-align: center;
-    font-size: 1.2rem;
+    font-size: calc(min(3vw, 1.1rem));
+    padding: calc(min(2.333vw, 0.7rem)) calc(min(3.333vw, 1rem));
+    padding-right: 0;
 }
 
 .give-clue-button {
     height: 100%;
     width: 7rem;
+    font-size: calc(min(3vw, 1.1rem));
+    padding: calc(min(2.333vw, 0.7rem)) 0;
 }
 
 .game-over-container {

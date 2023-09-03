@@ -562,10 +562,14 @@ function startGame(redMembers, blueMembers, role) {
 }
 
 function createGameScreen() {
+    // Get header container
+    const header_container = document.querySelector("header")
+
     // Get main container
     const main_container = document.querySelector(".main");
 
     // Create playing board
+    addClass(header_container, "playing-board");
     addClass(main_container, "playing-board");
 
     // Create card container
@@ -738,10 +742,14 @@ function createGameScreen() {
 }
 
 function removeGameScreen() {
+    // Get header container
+    const header_container = document.querySelector("header")
+
     // Get main container
     const main_container = document.querySelector(".main");
 
-    // Tell CSS game is over
+    // Remove playing board
+    removeClass(header_container, "playing-board");
     removeClass(main_container, "playing-board");
 
     // Get all elements in main container
