@@ -89,8 +89,9 @@ rooms: {
             1: <#-of-cards-red-missed>,
             2: <#-of-cards-blue-missed>
         },
-        status: <current-screen>
-    }
+        status: <current-screen>,
+        logCache: [[<game-log-messages>, <sender-team>], ...]
+    },
     .
     .
     .
@@ -200,6 +201,7 @@ function newRoom(roomCode) {
         guessesLeft: 0,
         missedCards: { 1: 0, 2: 0 },
         status: "lobby",
+        logCache: [],
     };
 
     /*
@@ -346,7 +348,7 @@ function joinTeam(client, team) {
     const room = getRoom(roomCode);
     const player = getPlayer(client);
 
-    if (player.team == team || !getPlayerNames(roomCode, team).includes(null)) return;
+    if (player.team == team || !getPlayerNames(roomCode, team).some(name => name == null)) return;
 
     if (player.team != null && player.role != null) room.players[player.team][player.role] = null;
 
@@ -363,12 +365,14 @@ function joinTeam(client, team) {
         client.emit("new-game", getPlayerNames(roomCode, RED), getPlayerNames(roomCode, BLUE), player.role);
         client.emit(
             "new-round",
-            Object.values(room.cards),
+            Object.values(room.cards).map(cardData => ({...cardData, id: cardData.covered ? cardData.id : INNOCENT})),
             player.role,
             [SPYMASTER, OPPERATIVE],
             room.turn,
             room.scores
         );
+        client.emit("update-game-log", room.logCache)
+        client.emit("update-guesses-left", room.guessesLeft);
     }
 
     // Tell players about the new player that joined
@@ -442,7 +446,7 @@ function newGame(client) {
     const room = getRoom(roomCode);
 
     // Must have 4 players
-    if (getPlayerNames(roomCode, RED).includes(null) || getPlayerNames(roomCode, BLUE).includes(null)) return;
+    if (getPlayerNames(roomCode, RED).some(name => name == null) || getPlayerNames(roomCode, BLUE).some(name => name == null)) return;
 
     // Only allow host to start the game
     if (room.host != client.id) return;
@@ -498,6 +502,9 @@ function newRound(client) {
 
     // Change the status of the room so players know what state the game is is
     room.status = "game";
+
+    // Clear game log
+    room.logCache = [];
 
     // Change which team goes first
     room.startingTeam = room.startingTeam != RED ? RED : BLUE;
@@ -605,8 +612,9 @@ function guessCard(client, pos) {
     if (guessIsCorrect && usedBonusGuess) room.missedCards[player.team] -= 1;
     if (guessIsCorrect && playerHasAnotherGuess || usedBonusGuess) return;
 
+    if (!guessIsCorrect) room.guessesLeft += 1;
+
     // Inncorrect guess: Next turn
-    room.guessesLeft += 1;
     handleNewMissedCards(client);
     nextTurn(client);
 }
@@ -704,12 +712,14 @@ function giveClue(client, clue, amount) {
     // Make sure the clue has content
     if (!clue) return;
     // Make sure the amount is between 0 and 9
-    if (0 <= amount && amount <= 9) return;
+    if (amount < 0 || 9 < amount) return;
 
     // Reset opperative's guesses left
     room.guessesLeft = amount;
     // Tell everyone about the new clue
-    io.to(roomCode).emit("recive-clue", clue.toUpperCase(), amount, getPlayer(client).name, getPlayer(client).team);
+    const player = getPlayer(client);
+    io.to(roomCode).emit("recive-clue", clue.toUpperCase(), amount, player.name, player.team);
+    room.logCache.push([`${player.name}: '${clue.toUpperCase()}' for ${amount}`, player.team]);
 
     // Next Turn
     nextTurn(client, amount);
@@ -825,7 +835,7 @@ function getRoom(roomCode) {
  * @returns {String | null} the 3-digit room code
  */
 function getRoomCode(client) {
-    getPlayer(client)?.roomCode;
+    return getPlayer(client)?.roomCode;
 }
 
 /**
@@ -837,7 +847,7 @@ function getRoomCode(client) {
  * @returns {String[]} the names of all the players on a certain team
  */
 function getPlayerNames(roomCode, team) {
-    getRoom(roomCode)?.players[team].map(getPlayerName);
+    return getRoom(roomCode)?.players[team].map(getPlayerName);
 }
 
 /**
@@ -858,8 +868,9 @@ function getPlayerName(playerID) {
  */
 function getPlayerIds(roomCode) {
     // Use socket's adapter to get players currently connected
-    // Add convert into an array for easier use
-    return Array.from(io.sockets.adapter.rooms.get(roomCode));
+    const playerIds = io.sockets.adapter.rooms.get(roomCode);
+    // Convert into an array for easier use
+    return playerIds == null ? [] : Array.from(playerIds);
 }
 
 /**

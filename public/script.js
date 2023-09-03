@@ -99,6 +99,8 @@ client.on("update-players", updatePlayers);
 client.on("new-game", startGame);
 client.on("new-round", newRound);
 client.on("player-left", playerLeft);
+client.on("update-game-log", setGameLog);
+client.on("update-guesses-left", updateGuessesLeft);
 client.on("made-guess", madeGuess);
 client.on("cover-card", coverCard);
 client.on("recive-clue", reciveClue);
@@ -199,11 +201,8 @@ function createHomeScreen() {
 }
 
 function removeHomeScreen() {
-    const join_room_container = document.querySelector(".join-room-container");
-    const create_room_container = document.querySelector(".create-room-container");
-
-    if (join_room_container != null) join_room_container.remove();
-    if (create_room_container != null) create_room_container.remove();
+    const join_room_container = document.querySelector(".join-room-container")?.remove();
+    const create_room_container = document.querySelector(".create-room-container")?.remove();
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -356,6 +355,7 @@ function createLobbyScreen() {
         removeGameOverScreen();
         removeGameScreen();
         removeLobbyScreen();
+        removeRoomCodeDisplay();
         createHomeScreen();
 
         user.team = null;
@@ -398,20 +398,15 @@ function createLobbyScreen() {
 }
 
 function removeLobbyScreen() {
-    const home_button_container = document.querySelector(".back-button-container").remove();
-    const lobby_buttons_container = document.querySelector(".lobby-buttons-container").remove();
+    document.querySelector(".back-button-container")?.remove();
+    document.querySelector(".lobby-buttons-container")?.remove();
 
-    if (home_button_container != null) home_button_container.remove();
-    if (lobby_buttons_container != null) lobby_buttons_container.remove();
+    document.querySelector(".red-players-container")?.remove();
+    document.querySelector(".blue-players-container")?.remove();
+}
 
-    const red_players_container = document.querySelector(".red-players-container");
-    const blue_players_container = document.querySelector(".blue-players-container");
-
-    if (red_players_container == null) return;
-    if (blue_players_container == null) return;
-
-    red_players_container.remove();
-    blue_players_container.remove();
+function removeRoomCodeDisplay() {
+    document.querySelector(".room-code-container")?.remove();
 }
 
 function playerLeft(newHost) {
@@ -442,6 +437,25 @@ function toggleLeaveButton(value = true) {
     leave_button.disabled = value;
 }
 
+function setGameLog(gameLogList) {
+    // Get game log
+    const game_log = document.getElementById("game-log");
+    Array.from(game_log.children).forEach(message => message.remove());
+
+    gameLogList.forEach(([gameLogMessage, team]) => {
+        const log_message = newElem("li", "log-message");
+        addClass(log_message, CARDIDS[team].string);
+        log_message.textContent = gameLogMessage;
+        addChild(game_log, log_message);
+    });
+}
+
+function updateGuessesLeft(guessesLeft) {
+    user.guesses = guessesLeft;
+    
+    editTurnIndicator();
+}
+
 //? from server
 function updatePlayers(redTeam, blueTeam, roomStatus, playerRole = null) {
     // Get main container
@@ -462,13 +476,11 @@ function updatePlayers(redTeam, blueTeam, roomStatus, playerRole = null) {
                 ],
             };
 
-            caseNull = (label) => (label == null ? "--DISCONNECTED--" : label);
+            nametags[LEFT][TOP].textContent = redTeam[TOP] ?? "DISCONNECTED";
+            nametags[LEFT][BOTTOM].textContent = redTeam[BOTTOM] ?? "DISCONNECTED";
 
-            nametags[LEFT][TOP].textContent = caseNull(redTeam[TOP]);
-            nametags[LEFT][BOTTOM].textContent = caseNull(redTeam[BOTTOM]);
-
-            nametags[RIGHT][TOP].textContent = caseNull(blueTeam[TOP]);
-            nametags[RIGHT][BOTTOM].textContent = caseNull(blueTeam[BOTTOM]);
+            nametags[RIGHT][TOP].textContent = blueTeam[TOP] ?? "DISCONNECTED";
+            nametags[RIGHT][BOTTOM].textContent = blueTeam[BOTTOM] ?? "DISCONNECTED";
 
             nametags[user.team][user.role].textContent += " (YOU)";
         }
@@ -486,8 +498,8 @@ function updatePlayers(redTeam, blueTeam, roomStatus, playerRole = null) {
     const red_players_list = document.getElementById("red-players-list");
     const blue_players_list = document.getElementById("blue-players-list");
 
-    join_red_button.disabled = user.team == RED || !redTeam.includes(null);
-    join_blue_button.disabled = user.team == BLUE || !blueTeam.includes(null);
+    join_red_button.disabled = user.team == RED || !redTeam.some(name => name == null);
+    join_blue_button.disabled = user.team == BLUE || !blueTeam.some(name => name == null);
 
     document.querySelectorAll(".room-player").forEach((li) => li.remove());
 
@@ -511,7 +523,7 @@ function updatePlayers(redTeam, blueTeam, roomStatus, playerRole = null) {
         addChild(blue_players_list, list_element);
     });
 
-    if (!redTeam.includes(null) && !blueTeam.includes(null)) {
+    if (!redTeam.some(name => name == null) && !blueTeam.some(name => name == null)) {
         toggleLeaveButton(false);
     } else {
         toggleLeaveButton(true);
@@ -531,7 +543,7 @@ function updatePlayers(redTeam, blueTeam, roomStatus, playerRole = null) {
         addChild(lobby_buttons_container, play_button);
     }
 
-    if (!redTeam.includes(null) && !blueTeam.includes(null)) {
+    if (!redTeam.some(name => name == null) && !blueTeam.some(name => name == null)) {
         play_button.disabled = false;
     }
 }
@@ -705,8 +717,8 @@ function createGameScreen() {
         if (game_log_container.classList.contains("hidden")) {
             removeClass(game_log_container, "hidden");
             game_log_heading.textContent = "Game log";
-            const log_alert = document.querySelector(".log-alert");
-            if (log_alert != null) log_alert.remove();
+
+            document.querySelector(".log-alert")?.remove();
         } else {
             addClass(game_log_container, "hidden");
             game_log_heading.textContent = "Game log...";
@@ -874,6 +886,10 @@ function editCards(cards) {
         addBackID(card_back, card.id);
         addBackImage(card_back);
         addBackText(card_back, card.text);
+
+        if (card.covered) {
+            coverCard(card.pos, card.id);
+        }
     });
 }
 
@@ -892,8 +908,8 @@ function guessCard(pos) {
 }
 
 //? from server
-function coverCard(cardPos, cardId, newScores) {
-    updateScore(newScores);
+function coverCard(cardPos, cardId, newScores=null) {
+    if (newScores != null) updateScore(newScores);
 
     const card_pos_element = document.getElementById(cardPos);
     const card_element = card_pos_element.firstChild;
@@ -977,9 +993,6 @@ function madeGuess(guessesLeft = user.guesses) {
         turnIndicator.textContent = `Your Turn... ${user.guesses - guessesLeft}/${user.guesses}`;
     }
 
-    // Check if pass button shoud
-    if (guessesLeft <= 0) return;
-
     removePassButton();
     createPassButton();
 }
@@ -1004,8 +1017,7 @@ function createPassButton() {
 
 function removePassButton() {
     // Get pass button container
-    const pass_button_container = document.querySelector(".pass-button-container");
-    if (pass_button_container != null) pass_button_container.remove();
+    document.querySelector(".pass-button-container")?.remove();
 }
 
 function passGuess() {
@@ -1059,6 +1071,8 @@ function nextTurn(newTurn, amount = 0) {
 function createPlayingElements() {
     removePlayingElements();
 
+    createTurnReminder();
+
     if (user.role == SPYMASTER) createClueInput();
     else document.querySelectorAll(".card").forEach((card_element) => addClass(card_element, "clickable"));
 }
@@ -1067,6 +1081,41 @@ function removePlayingElements() {
     document.querySelectorAll(".card").forEach((card_element) => removeClass(card_element, "clickable"));
     removeClueInput();
     removePassButton();
+}
+
+function createTurnReminder() {
+    /*
+    <div class="turn-reminder-container">
+        <h3 class="turn-reminder">Your Turn</h3>
+    </div>
+    */
+
+    // Get main container
+    const main_container = document.querySelector(".main");
+
+    // Create turn reminder container
+    const turn_reminder_container = newElem("div", "turn-reminder-container");
+
+    // Create turn reminder
+    const turn_reminder = newElem("h3", "turn-reminder");
+    turn_reminder.textContent = "Your Turn!"
+    
+    addChild(turn_reminder_container, turn_reminder);
+
+    // Add turn reminder container to main container
+    addChild(main_container, turn_reminder_container);
+
+    setTimeout(() => animateTurnReminder(turn_reminder_container), 300);
+}
+
+function animateTurnReminder(turn_reminder_container) {
+    addClass(turn_reminder_container, "animated");
+
+    setTimeout(() => removeTurnReminder(turn_reminder_container), 2500);
+}
+
+function removeTurnReminder(turn_reminder_container) {
+    turn_reminder_container.remove();
 }
 
 function editTurnIndicator() {
@@ -1242,6 +1291,7 @@ function createGameOverScreen(winningTeam, causeMessage) {
         removeGameOverScreen();
         removeGameScreen();
         removeLobbyScreen();
+        removeRoomCodeDisplay();
         createHomeScreen();
 
         user.team = null;
@@ -1260,9 +1310,7 @@ function createGameOverScreen(winningTeam, causeMessage) {
 
 function removeGameOverScreen() {
     // Get game over container
-    const game_over_container = document.querySelector(".game-over-container");
-
-    if (game_over_container != null) game_over_container.remove();
+    document.querySelector(".game-over-container")?.remove();
 }
 
 // ----------------------------------------------------------------------------------------------------

@@ -71,8 +71,10 @@ button {
     border-radius: 1rem;
     padding: 0;
     
-    &:hover {
-        background: var(--color-highlight);
+    @media (hover: hover) {
+        &:hover {
+            background: var(--color-highlight);
+        }
     }
 
     &:active, &:disabled {
@@ -339,11 +341,13 @@ button {
     cursor: pointer;
     transition: all 50ms ease-in-out;
     
-    :not(&.covered) {
-        &.clickable:hover  {
-            width: calc(var(--card-width) * var(--card-zoom-factor));
-            height: calc(var(--card-height) * var(--card-zoom-factor));
-            font-size: calc(var(--card-zoom-factor) * 1rem);
+    @media (hover: hover) {
+        :not(&.covered) {
+            &.clickable:hover  {
+                width: calc(var(--card-width) * var(--card-zoom-factor));
+                height: calc(var(--card-height) * var(--card-zoom-factor));
+                font-size: calc(var(--card-zoom-factor) * 1rem);
+            }
         }
     }
 }
@@ -414,14 +418,14 @@ button {
 
 .topleft-nametag-container, .bottomleft-nametag-container, .topright-nametag-container, .bottomright-nametag-container {
     position: absolute;
-    width: 12rem;
-    height: 3rem;
+    width: calc(min(40vw, 12rem));
+    height: calc(min(10vw, 3rem));
     border-radius: 0.5rem;
     background: var(--color-primary);
     border-width: 3px;
     border-style: outset;
     font-family: Verdana, Geneva, Tahoma, sans-serif;
-    font-size: 1.1rem;
+    font-size: calc(min(3.67vw, 1.1rem));
     color: var(--color-contrast);
     transition: color 300ms ease-in-out;
     
@@ -442,22 +446,22 @@ button {
 
 .topleft-nametag-container {
     left: 0;
-    top: -4rem;
+    top: calc(max(-13.3vw, -4rem));
 }
 
 .bottomleft-nametag-container {
     left: 0;
-    bottom: -4rem;
+    bottom: calc(max(-13.3vw, -4rem));
 }
 
 .topright-nametag-container {
     right: 0;
-    top: -4rem;
+    top: calc(max(-13.3vw, -4rem));
 }
 
 .bottomright-nametag-container {
     right: 0;
-    bottom: -4rem;
+    bottom: calc(max(-13.3vw, -4rem));
 }
 
 .topleft-nametag-label, .bottomleft-nametag-label, .topright-nametag-label, .bottomright-nametag-label {
@@ -478,7 +482,7 @@ button {
 .turn-indicator-container {
     position: absolute;
     left: 50%;
-    top: -7.5rem;
+    top: calc(max(-25vw / 1.5 - 2.5rem, -7.5rem));
     width: 15rem;
     height: 3rem;
     text-align: center;
@@ -490,14 +494,14 @@ button {
     width: max-content;
     left: 50%;
     top: 50%;
-    padding: 0.7rem 1rem;
+    padding: calc(min(2.333vw, 0.7rem)) calc(min(3.333vw, 1rem));
     transform: translate(-50%, -50%);
     margin: 0;
     background: var(--color-primary);
     border: 2px solid var(--color-contrast);
     border-radius: 0.5rem;
     font-family: Verdana, Geneva, Tahoma, sans-serif;
-    font-size: 1.1rem;
+    font-size: calc(min(3.67vw, 1.1rem));
 }
 
 .red-score-container, .blue-score-container {
@@ -559,6 +563,33 @@ button {
     font-size: 2rem;
 }
 
+.turn-reminder-container {
+    position: fixed;
+    width: 100%;
+    height: 30%;
+    top: 35%;
+    background: linear-gradient(rgba(0,0,0,0) 0%, rgba(0,0,0,0.7) 5%, rgba(0,0,0,0.3) 95%, rgba(0,0,0,0) 100%);
+
+    &.animated {
+        .turn-reminder {
+            left: calc(100% + 20rem);
+        }
+    }
+}
+
+.turn-reminder {
+    position: absolute;
+    top: 50%;
+    left: -20rem;
+    width: max-content;
+    margin: 0;
+    transform: translate(-50%, -50%);
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    font-size: 4rem;
+    text-shadow: 0 0 1rem var(--color-highlight), 0 0 1rem var(--color-primary), 0 0 1rem var(--color-primary), 0 0 2rem var(--color-primary);
+    transition: all 2000ms cubic-bezier(0, 1, 0.8, 0);
+}
+
 #pass-button {
     position: relative;
     width: 100%;
@@ -569,15 +600,18 @@ button {
     position: absolute;
     right: 0.3rem;
     bottom: 0.3rem;
-    width: 15rem;
+    width: calc(min(50vw, 15rem));
     height: 75%;
 
     &.hidden {
-        height: 2.5rem;
+        height: calc(min(8.333vw, 2.5rem));
+        opacity: 50%;
 
         .game-log-elements {
-            &:not(:hover) {
-                opacity: 50%;
+            @media (hover: hover) {
+                &:hover {
+                    opacity: 100%;
+                }
             }
         
             .game-log {
@@ -599,7 +633,7 @@ button {
     position: absolute;
     width: 100%;
     height: 100%;
-    border-radius: 1.6rem;
+    border-radius: calc(min(5.333rem, 1.6rem));
     border: 2px solid var(--color-contrast);
     background: var(--color-secondary);
     transition: opacity 200ms ease-in-out;
@@ -609,7 +643,8 @@ button {
     position: sticky;
     text-align: left;
     top: 0;
-    margin: 0.5rem 0 0 1rem;
+    margin: calc(min(1.667em, 0.5em)) 0 0 calc(min(3.333em, 1em));
+    font-size: calc(min(4vw, 1.2rem));
     cursor: pointer;
 }
 
@@ -630,8 +665,10 @@ button {
     &::-webkit-scrollbar {
         background: var(--color-contrast);
     }
-    &::-webkit-scrollbar-thumb:hover {
-        background: var(--color-primary);
+    @media (hover: hover) {
+        &::-webkit-scrollbar-thumb:hover {
+            background: var(--color-primary);
+        }
     }
     &::-webkit-scrollbar-thumb {
         background: var(--color-secondary);
