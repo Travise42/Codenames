@@ -605,9 +605,10 @@ button {
 
     &.hidden {
         height: calc(min(8.333vw, 2.5rem));
-        opacity: 50%;
 
         .game-log-elements {
+            opacity: 50%;
+            
             @media (hover: hover) {
                 &:hover {
                     opacity: 100%;
