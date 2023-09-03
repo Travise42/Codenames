@@ -388,18 +388,70 @@ function createLobbyScreen() {
     // Stop if user is not host
     if (!user.isHost) return;
 
+    const [custom_words_checkbox, custom_words_entry] = createCustomWordEntry();
+
     // Create play button if user is host
     const play_button = newElem("button", null, "play-button");
     play_button.textContent = "Play";
     play_button.disabled = true;
-    play_button.addEventListener("click", () => client.emit("new-game"));
+    play_button.addEventListener("click", () => client.emit("new-game", custom_words_checkbox.checked, custom_words_entry.value));
 
     addChild(lobby_buttons_container, play_button);
+}
+
+function createCustomWordEntry() {
+    /*
+    <div class="custom-words-container">
+        <input type="checkbox" id="custom-words-checkbox" name="shouldUseCustomWords" value="1">
+        <label id="custom-words-label" for="use-custom-words">
+            Use Custom Words
+        </label>
+        <br><br>
+        <textarea class="custom-words-entry" style="resize: none; height: 350px; width: 200px;">
+        </textarea>
+    </div>
+    */
+
+    // Get main container
+    const main_container = document.querySelector(".main");
+
+    // Create custom words container
+    const custom_words_container = newElem("div", "custom-words-container");
+
+    // Create use custom words checkbox
+    const custom_words_checkbox = newElem("input", null, "custom-words-checkbox");
+    custom_words_checkbox.type = "checkbox";
+    custom_words_checkbox.name = "shouldUseCustomWords";
+    custom_words_checkbox.value = 1;
+
+    addChild(custom_words_container, custom_words_checkbox);
+
+    // Create use custom words label
+    const custom_words_label = newElem("label", null, "custom-words-label");
+    custom_words_label.for = "use-custom-words";
+    custom_words_label.textContent = " Use Custom Words";
+
+    addChild(custom_words_container, custom_words_label);
+
+    // Create break elements
+    addChild(custom_words_container, newElem("br"));
+    addChild(custom_words_container, newElem("br"));
+
+    // Create textarea
+    const custom_words_entry = newElem("textarea", "custom-words-entry");
+    custom_words_entry.placeholder = "Enter atleast 25 custom words seperated by commas (if you want to use custom words)";
+    
+    addChild(custom_words_container, custom_words_entry);
+
+    addChild(main_container, custom_words_container);
+
+    return [custom_words_checkbox, custom_words_entry];
 }
 
 function removeLobbyScreen() {
     document.querySelector(".back-button-container")?.remove();
     document.querySelector(".lobby-buttons-container")?.remove();
+    document.querySelector(".custom-words-container")?.remove();
 
     document.querySelector(".red-players-container")?.remove();
     document.querySelector(".blue-players-container")?.remove();
@@ -534,10 +586,12 @@ function updatePlayers(redTeam, blueTeam, roomStatus, playerRole = null) {
     let play_button = document.getElementById("play-button");
 
     if (play_button == null) {
+        const [custom_words_checkbox, custom_words_entry] = createCustomWordEntry();
+
         play_button = newElem("button", null, "play-button");
         play_button.textContent = "Play";
         play_button.disabled = true;
-        play_button.addEventListener("click", () => client.emit("new-game"));
+        play_button.addEventListener("click", () => client.emit("new-game", custom_words_checkbox.checked, custom_words_entry.value));
 
         const lobby_buttons_container = document.querySelector(".lobby-buttons-container");
         addChild(lobby_buttons_container, play_button);
@@ -1163,12 +1217,12 @@ function editTurnIndicator() {
     // Player's opponents's turn
     else if (user.team != turn.team) {
         // The opponent is opperative
-        if (turn.role == SPYMASTER) {
+        if (turn.role == OPPERATIVE) {
             turn_indicator.textContent = "The Opponent Opperative is Guessing...";
         }
 
         // The opponent is spymaster
-        else if (turn.role == OPPERATIVE) {
+        else if (turn.role == SPYMASTER) {
             turn_indicator.textContent = "The Opponent Spymaster is Thinking...";
         }
     }

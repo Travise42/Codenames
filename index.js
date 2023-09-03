@@ -127,7 +127,7 @@ io.on("connection", (client) => {
     client.on("join-room", (roomCode, nickname, isHost = false) => joinRoom(client, roomCode, nickname));
     client.on("join-team", (...args) => joinTeam(client, ...args));
     client.on("leave-team", () => leaveTeam(client));
-    client.on("new-game", () => newGame(client));
+    client.on("new-game", (...args) => newGame(client, ...args));
 
     // game screen
     client.on("pass-guess", () => passGuess(client));
@@ -202,6 +202,8 @@ function newRoom(roomCode) {
         missedCards: { 1: 0, 2: 0 },
         status: "lobby",
         logCache: [],
+        words: null,
+        usingCustomWords: false,
     };
 
     /*
@@ -441,7 +443,7 @@ function getEmptySpaceOnTeam(roomCode, playerTeam) {
  * @param {Socket} client any connected socket
  * @returns 
  */
-function newGame(client) {
+function newGame(client, usingCustomWords, customWords) {
     const roomCode = getRoomCode(client);
     const room = getRoom(roomCode);
 
@@ -450,6 +452,13 @@ function newGame(client) {
 
     // Only allow host to start the game
     if (room.host != client.id) return;
+
+    room.words = null;
+    room.usingCustomWords = false;
+    if (usingCustomWords) {
+        room.words = customWords?.split(",").map(x => x.trim());
+        if (room.words.length >= 25) room.usingCustomWords = true;
+    }
 
     Object.values(room.players).forEach((teamMembers) => {
         teamMembers.forEach((playerId, role) => {
@@ -527,7 +536,7 @@ function newRound(client) {
     cardIds = setCards(cardIds, 1, ASSASSIN);
 
     // Create layout texts
-    const card_texts = randFrom(words, 25);
+    const card_texts = randFrom(room.words ?? words, 25);
 
     // Combine ids and texts
     const cards = room.cards;
