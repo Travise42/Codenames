@@ -458,6 +458,7 @@ function newGame(client, usingCustomWords, customWords) {
     if (usingCustomWords) {
         room.words = customWords?.split(",").map(x => x.trim());
         if (room.words.length >= 25) room.usingCustomWords = true;
+        else room.words = null;
     }
 
     Object.values(room.players).forEach((teamMembers) => {
