@@ -127,8 +127,8 @@ function createNameScreen() {
     // create name input
     const name_input_element = newElem("input", null, "name-input");
     name_input_element.type = "text";
-    name_input_element.placeholder = "nickname";
-
+    name_input_element.placeholder = "nickname"; 
+    
     addChild(name_container, name_input_element);
 
     // create start button
@@ -434,7 +434,6 @@ function createCustomWordEntry() {
     addChild(custom_words_container, custom_words_label);
 
     // Create break elements
-    addChild(custom_words_container, newElem("br"));
     addChild(custom_words_container, newElem("br"));
 
     // Create textarea
