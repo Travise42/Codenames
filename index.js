@@ -606,15 +606,19 @@ function guessCard(client, pos) {
     // Decrease player's guesses left
     room.guessesLeft -= 1;
 
+    const guessIsCorrect = player.team == card.id;
+
+    const gameLogMessageData = [`${player.name} ${guessIsCorrect ? "correctly" : "incorrectly"} guessed '${card.text}'`, player.team];
+
     // Tell members to cover the chosen card
-    io.to(roomCode).emit("cover-card", pos, card.id, room.scores);
+    io.to(roomCode).emit("cover-card", pos, card.id, room.scores, gameLogMessageData);
     // Tell the player that they made a valid guess
     client.emit("made-guess", room.guessesLeft);
+    room.logCache.push(gameLogMessageData);
 
     // Check if the game should end
     handleGameOver(client, card);
 
-    const guessIsCorrect = player.team == card.id;
     const usedBonusGuess = room.guessesLeft == 0 && 0 < room.missedCards[player.team];
     const playerHasAnotherGuess = 0 < room.guessesLeft;
 
@@ -638,12 +642,21 @@ function guessCard(client, pos) {
  * @returns 
  */
 function passGuess(client) {
+    const roomCode = getRoomCode(client);
+    const player = getPlayer(client);
+    const room = getRoom(roomCode)
+
     // Handle cheaters
     // Make sure it is the player's turn
     if (!isActive(client)) return;
 
+    const gameLogMessageData = [`${player.name} passed`, player.team];
+    room.logCache.push(gameLogMessageData);
+    io.to(roomCode).emit("passed-gamelog", gameLogMessageData);
+
     handleNewMissedCards(client);
     nextTurn(client);
+
 }
 
 /**
@@ -712,6 +725,7 @@ function giveClue(client, clue, amount) {
     // Get cached data
     const roomCode = getRoomCode(client);
     const room = getRoom(roomCode);
+    const player = getPlayer(client);
 
     // Do nothing is the room doesn't exist
     if (room == null) return;
@@ -726,10 +740,12 @@ function giveClue(client, clue, amount) {
 
     // Reset opperative's guesses left
     room.guessesLeft = amount;
+
     // Tell everyone about the new clue
-    const player = getPlayer(client);
-    io.to(roomCode).emit("recive-clue", clue.toUpperCase(), amount, player.name, player.team);
-    room.logCache.push([`${player.name}: '${clue.toUpperCase()}' for ${amount}`, player.team]);
+    const gameLogMessageData = [`${player.name} says '${clue.toUpperCase()}' for ${amount}`, player.team];
+
+    io.to(roomCode).emit("recive-clue", gameLogMessageData);
+    room.logCache.push(gameLogMessageData);
 
     // Next Turn
     nextTurn(client, amount);

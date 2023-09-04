@@ -100,6 +100,7 @@ client.on("new-game", startGame);
 client.on("new-round", newRound);
 client.on("player-left", playerLeft);
 client.on("update-game-log", setGameLog);
+client.on("passed-gamelog", logNewMessage);
 client.on("update-guesses-left", updateGuessesLeft);
 client.on("made-guess", madeGuess);
 client.on("cover-card", coverCard);
@@ -969,8 +970,9 @@ function guessCard(pos) {
 }
 
 //? from server
-function coverCard(cardPos, cardId, newScores=null) {
+function coverCard(cardPos, cardId, newScores=null, gameLogMessageData=null) {
     if (newScores != null) updateScore(newScores);
+    if (gameLogMessageData != null) logNewMessage(gameLogMessageData);
 
     const card_pos_element = document.getElementById(cardPos);
     const card_element = card_pos_element.firstChild;
@@ -1086,17 +1088,14 @@ function passGuess() {
 }
 
 //? from server
-function reciveClue(clue, amount, senderName, senderTeam) {
+function reciveClue(gameLogMessageData) {
     // Get game log container
     const game_log_container = document.querySelector(".game-log-container");
+    
     // Get game log
     const game_log = document.getElementById("game-log");
 
-    // Create new list element
-    const log_message = newElem("li", "log-message");
-    addClass(log_message, CARDIDS[senderTeam].string);
-    log_message.textContent = `${senderName}: '${clue}' for ${amount}`;
-    addChild(game_log, log_message);
+    logNewMessage(gameLogMessageData)
 
     if (game_log_container.classList.contains("hidden")) {
         const log_alert = newElem("img", "log-alert");
@@ -1105,6 +1104,17 @@ function reciveClue(clue, amount, senderName, senderTeam) {
     }
 
     game_log.scrollTop = game_log.scrollHeight;
+}
+
+function logNewMessage([newMessage, team]) {
+    // Get game log
+    const game_log = document.getElementById("game-log");
+
+    // Create new list element
+    const log_message = newElem("li", "log-message");
+    addClass(log_message, CARDIDS[team].string);
+    log_message.textContent = newMessage;
+    addChild(game_log, log_message);
 }
 
 function clearLog() {

@@ -243,8 +243,9 @@ button {
     font-size: 1.1rem;
     text-align: center;
     padding-top: 2.2rem;
-    width: 100%;
-    left: 0;
+    width: 10rem;
+    left: 50%;
+    transform: translateX(-50%);
 
     &:not(:has(#play-button)) {
         padding-top: 4rem;
@@ -679,7 +680,7 @@ button {
     position: absolute;
     right: 0.3rem;
     bottom: 0.3rem;
-    width: calc(min(50vw, 15rem));
+    width: calc(18rem);
     height: 75%;
 
     &.hidden {
@@ -762,19 +763,21 @@ button {
 }
 
 .log-message {
-    width: 100%;
+    width: auto;
     margin-top: 0.3rem;
-    padding: 0.1rem;
+    padding: 0.2rem;
     padding-left: 0.5rem;
+    
     background: rgba(0, 0, 0, 0.2);
+    
     &.red {
-        color: var(--color-red);
+        background: rgba(200, 80, 80, 0.75);
     }
     &.green {
-        color: var(--color-green);
+        background: rgba(122, 255, 133, 0.75);
     }
     &.blue {
-        color: var(--color-blue);
+        background: rgba(80, 100, 250, 0.75);
     }
 }
 
