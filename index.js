@@ -744,7 +744,7 @@ function giveClue(client, clue, amount) {
     // Tell everyone about the new clue
     const gameLogMessageData = [`${player.name} says '${clue.toUpperCase()}' for ${amount}`, player.team];
 
-    io.to(roomCode).emit("recive-clue", gameLogMessageData);
+    io.to(roomCode).emit("recieve-clue", gameLogMessageData, [clue, amount, player.team, player.role]);
     room.logCache.push(gameLogMessageData);
 
     // Next Turn

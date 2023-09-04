@@ -62,6 +62,9 @@ let SPYMASTER = 1;
 
 const COLUMNS = ["a", "b", "c", "d", "e"];
 
+const ALERT_IMAGE = "img/icons/alert.png";
+const CALLOUT_IMAGE = "img/icons/callOut.png";
+
 // ----------------------------------------------------------------------------------------------------
 // Create Player Data
 
@@ -104,7 +107,7 @@ client.on("passed-gamelog", logNewMessage);
 client.on("update-guesses-left", updateGuessesLeft);
 client.on("made-guess", madeGuess);
 client.on("cover-card", coverCard);
-client.on("recive-clue", reciveClue);
+client.on("recieve-clue", recieveClue);
 client.on("next-turn", nextTurn);
 client.on("game-over", gameOver);
 
@@ -1033,7 +1036,7 @@ function giveClue() {
         const inner = card.firstChild;
         if (inner.lastChild.className == "card-cover") return;
         removeClass(card_pos, "invalid");
-        if (clue_element.value.toLowerCase() == inner.firstChild.lastChild.textContent.toLowerCase())
+        if (clue_element.value.toUpperCase() == inner.firstChild.lastChild.textContent.toUpperCase())
             duplicates.push(card_pos);
     });
     if (duplicates.length) {
@@ -1043,7 +1046,7 @@ function giveClue() {
         return;
     }
 
-    client.emit("give-clue", clue_element.value, amount_element.value);
+    client.emit("give-clue", clue_element.value.toUpperCase(), amount_element.value);
     clue_element.value = "";
 }
 
@@ -1088,22 +1091,93 @@ function passGuess() {
 }
 
 //? from server
-function reciveClue(gameLogMessageData) {
+function recieveClue(gameLogMessageData, senderData) {
     // Get game log container
     const game_log_container = document.querySelector(".game-log-container");
     
     // Get game log
     const game_log = document.getElementById("game-log");
 
-    logNewMessage(gameLogMessageData)
+    logNewMessage(gameLogMessageData);
+    createVisualClue(...senderData);
 
     if (game_log_container.classList.contains("hidden")) {
         const log_alert = newElem("img", "log-alert");
-        addPath(log_alert, "img/icons/alert.png");
+        addPath(log_alert, ALERT_IMAGE);
         addChild(game_log_container, log_alert);
     }
 
     game_log.scrollTop = game_log.scrollHeight;
+}
+
+function createVisualClue(clue, amount, team, role) {
+    /*
+    <div class="visual-clue-container blue top">
+        <div class="clue-speech-bubble">
+            <div class="clue-speech-bubble-text">
+                'Alphabet Goes ABCD'
+                <br>
+                for 2
+            </div>
+        </div>
+
+        <div class="call-out-container">
+            <img class="call-out-image" src="img/icons/callOut.png">
+
+            <h3 class="call-out-text">
+                0/3
+            </h3>
+        </div>
+    </div>
+    */
+
+    // Get rid of previous visual clues
+    removeVisualClues();
+
+    // Get main container
+    const main_container = document.querySelector(".main");
+
+    // Create visual clue container
+    const visual_clue_container = newElem("div", "visual-clue-container");
+    addClass(visual_clue_container, CARDIDS[team].string);
+    addClass(visual_clue_container, role ? "bottom" : "top");
+
+        // Create clue speech bubble
+        const clue_speech_bubble = newElem("div", "clue-speech-bubble");
+
+            // Create clue speech bubble text
+            const clue_speech_bubble_text = newElem("div", "clue-speech-bubble-text");
+            clue_speech_bubble_text.innerHTML = `'${clue}'<br \>for ${amount}`;
+
+            addChild(clue_speech_bubble, clue_speech_bubble_text);
+
+        addChild(visual_clue_container, clue_speech_bubble);
+
+        // Create call out container
+        const call_out_container = newElem("div", "call-out-container");
+
+            // Create call out image
+            const call_out_image = newElem("img", "call-out-image");
+            addPath(call_out_image, CALLOUT_IMAGE);
+
+            addChild(call_out_container, call_out_image);
+
+            // Create call out text
+            const call_out_text = newElem("h3", "call-out-text");
+            call_out_text.textContent = "0/3";
+
+            addChild(call_out_container, call_out_text);
+
+        addChild(visual_clue_container, call_out_container);
+        
+    addChild(main_container, visual_clue_container);
+}
+
+function removeVisualClues() {
+    // Get visual clue container
+    document.querySelectorAll(".visual-clue-container").forEach((visual_clue_container) => {
+        visual_clue_container.remove();
+    });
 }
 
 function logNewMessage([newMessage, team]) {
@@ -1114,6 +1188,7 @@ function logNewMessage([newMessage, team]) {
     const log_message = newElem("li", "log-message");
     addClass(log_message, CARDIDS[team].string);
     log_message.textContent = newMessage;
+
     addChild(game_log, log_message);
 }
 
@@ -1128,6 +1203,8 @@ function nextTurn(newTurn, amount = 0) {
     turn = newTurn;
 
     const isPlayersTurn = turn.team == user.team && turn.role == user.role;
+
+    if (turn.role == SPYMASTER) removeVisualClues();
 
     if (isPlayersTurn) {
         user.guesses = amount;

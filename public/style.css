@@ -676,6 +676,160 @@ button {
     height: 100%;
 }
 
+.visual-clue-container {
+    position: absolute;
+    
+    padding: 0.5em;
+    
+    width: max-content;
+    min-width: 7em;
+    height: 3.5em;
+    
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    font-size: calc(min(5vw, 1.5rem));
+    color: var(--color-contrast);
+        
+    border: 2px solid var(--color-contrast);
+    border-radius: 1em;
+    
+    background: var(--color-highlight);
+    opacity: 80%;
+
+    &.red, &.blue {
+        .clue-speech-bubble:before {
+            position: absolute;
+            top: 0.1em;
+            bottom: auto;
+            
+            border: 1.1em solid;
+            
+            width: 0;
+            height: 0;
+            
+            content: ' ';
+        }
+    
+        .clue-speech-bubble:after {
+            position: absolute;
+            top: 0.1em;
+            bottom: auto;
+            
+            border: 1.1em solid;
+            
+            width: 0;
+            height: 0;
+            
+            content: ' ';
+        }
+    
+        &.red {
+            left: calc(min(60vw, 10em));
+            right: auto;
+    
+            border-top-left-radius: 0.5em;
+            
+            .clue-speech-bubble:before {
+                left: 0.65em;
+                right: auto;
+                transform: translateX(-2.8em);
+                
+                border-color: transparent var(--color-contrast) transparent transparent;
+            }
+        
+            .clue-speech-bubble:after {
+                left: 0.5em;
+                right: auto;
+                transform: translateX(-2.5em);
+                
+                border-color: transparent var(--color-highlight) transparent transparent;
+            }
+        }
+    
+        &.blue {
+            left: auto;
+            right: calc(min(60vw, 10em));
+    
+            border-top-right-radius: 0.5em;
+            
+            .clue-speech-bubble:before {
+                left: auto;
+                right: 0.65em;
+                transform: translateX(2.8em);
+                
+                border-color: transparent transparent transparent var(--color-contrast);
+            }
+        
+            .clue-speech-bubble:after {
+                left: auto;
+                right: 0.5em;
+                transform: translateX(2.5em);
+                
+                border-color: transparent transparent transparent var(--color-highlight);
+            }
+        }
+    
+        &.top {
+            top: -2.75em;
+        }
+    
+        &.bottom {
+            bottom: -2.5em;
+            transform: translateY(55%);
+        }
+    }
+    
+
+    .call-out-container {
+        position: absolute;
+        left: auto;
+        right: 0.5em;
+        top: auto;
+        bottom: 0.5em;
+
+        width: 3em;
+        height: 2em;
+        
+
+        .call-out-image {
+            position: absolute;
+            
+            right: 0;
+            bottom: 0;
+
+            background: var(--color-secondary);
+            padding: 5% 20% 10% 20%;
+            border: 2px outset var(--color-contrast);
+            border-radius: 0.5em;
+            
+            height: 65%;
+
+            &:hover {
+                background: var(--color-red);
+            }
+
+            &:active {
+                border: 2px inset var(--color-contrast);
+                background: var(--color-contrast);
+            }
+        }
+
+        .call-out-text {
+            position: absolute;
+            
+            margin: 0;
+
+            bottom: -0.35em;
+            right: 1.4em;
+
+            letter-spacing: -0.15em;
+
+            color: white;
+
+            text-shadow: 4px 3px var(--color-contrast);
+        }
+    }
+}
+    
 .game-log-container {
     position: absolute;
     right: 0.3rem;
